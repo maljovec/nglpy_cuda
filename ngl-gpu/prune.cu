@@ -2,8 +2,74 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
+#include <map>
+#include <algorithm>
 
 #include <ANN/ANN.h>
+
+class CommandLine {
+	std::vector<std::string> argnames;
+    std::map<std::string, std::string> args;
+	std::map<std::string, std::string> descriptions;
+	std::vector<std::string> requiredArgs;
+  public:
+    CommandLine() {
+	}
+	void addArgument(std::string cmd, std::string defaultValue, std::string description="", bool required = false) {
+		argnames.push_back(cmd);
+        if(description!="") {
+            descriptions[cmd] = description;
+        }
+		if(required && find(requiredArgs.begin(), requiredArgs.end(), cmd)==requiredArgs.end()) {
+			requiredArgs.push_back(cmd);
+		}
+		setArgument(cmd, defaultValue);
+    }
+	void setArgument(std::string cmd, std::string value) {
+		args[cmd] = value;
+	}
+	bool processArgs(int argc, char *argv[]) {
+		std::map<std::string, int> check;
+		for(unsigned int k = 0;k<requiredArgs.size();k++) {
+			check[requiredArgs[k]] = 0;
+		}
+		for(int i=1; i<argc; i+=2) {
+			if(i+1<argc) {
+				std::string arg = std::string(argv[i]);
+				std::string val = std::string(argv[i+1]);
+				setArgument(arg, val);
+				if(check.find(arg)!=check.end()) {
+					check[arg] = check[arg] + 1;
+				}
+			}
+		}
+		for(std::map<std::string,int>::const_iterator it = check.begin(); it!=check.end();it++) {
+			int n = it->second;
+            if(n==0) {
+                return false;
+            }
+		}
+		return true;
+	}
+	void showUsage() {
+		for(unsigned int k = 0; k<argnames.size();k++) {
+			fprintf(stderr, "\t%s\t\t%s (%s)\n", argnames[k].c_str(), descriptions[argnames[k]].c_str(), args[argnames[k]].c_str());
+		}
+	}
+	float getArgFloat(std::string arg) {
+		std::string val = args[arg];
+		return atof(val.c_str());
+	}													 
+    int getArgInt(std::string arg) {
+        std::string val = args[arg];
+		return atoi(val.c_str());
+	}
+    std::string getArgString(std::string arg) {
+		std::string val = args[arg];
+		return val;
+	}
+};
 
 __global__
 void prune_discrete(const int N, const int D, const int K, const int steps,
@@ -89,8 +155,8 @@ void prune_discrete(const int N, const int D, const int K, const int steps,
 }
 
 __global__
-void prune(const int N, const int D, const int K, const int steps, float *X,
-           int *edgesIn, int *edgesOut, float lp, float beta)
+void prune(const int N, const int D, const int K, float *X, int *edgesIn,
+           int *edgesOut, float lp, float beta)
 {
     int index_x = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
@@ -224,21 +290,39 @@ void createTemplate(float * data, float beta=1, int p=2, int steps=100) {
 
 int main(int argc, char **argv)
 {
+
+  CommandLine cl;
+  cl.addArgument("-i", "input", "Input points", true);
+  cl.addArgument("-d", "2", "Number of dimensions", true);
+  cl.addArgument("-n", "1000000", "Number of points", true);
+  cl.addArgument("-k", "-1", "K max", false);
+  cl.addArgument("-b", "1.0", "Beta", false);
+  cl.addArgument("-p", "2.0", "Lp-norm", false);
+  cl.addArgument("-s", "-1", "# of Discretization Steps. Use -1 to disallow discretization.", false);
+  bool hasArguments = cl.processArgs(argc, argv);
+  if(!hasArguments) {
+    fprintf(stderr, "Missing arguments\n");
+    fprintf(stderr, "Usage:\n\n");
+    cl.showUsage();
+    exit(1);
+  }
+
   struct cudaDeviceProp properties;
   cudaGetDeviceProperties(&properties, 0);
-  std::cout << "using " << properties.multiProcessorCount << " multiprocessors"
+  std::cerr << "using " << properties.multiProcessorCount << " multiprocessors"
             << std::endl 
             << "max threads per processor: " 
             << properties.maxThreadsPerMultiProcessor << std::endl;
 
-  std::string pointFile = "../data_2_1000000_0.csv";
-//   std::string edgeFile = "../knn_2D_1000000.txt";
+  std::string pointFile = cl.getArgString("-i");
+  int D = cl.getArgInt("-d");
+  int N = cl.getArgInt("-n");
+  int K = cl.getArgInt("-k");
+  int steps = cl.getArgInt("-s");
+  bool discrete = steps > 0;
 
-  int N = 1000000;
-  int D = 2;
-  int K = 100;
-  int steps = 9999;
-  bool discrete = false;
+  float beta = cl.getArgFloat("-b");
+  float lp = cl.getArgFloat("-p");
 
   // Load data set and edges from files
   // TODO
@@ -264,7 +348,9 @@ int main(int argc, char **argv)
   cudaMallocManaged(&x, N*D*sizeof(float));
   cudaMallocManaged(&edgesIn, N*K*sizeof(int));
   cudaMallocManaged(&edgesOut, N*K*sizeof(int));
-  cudaMallocManaged(&referenceShape, (steps+1)*sizeof(float));
+  if(discrete) {
+    cudaMallocManaged(&referenceShape, (steps+1)*sizeof(float));
+  }
 
   std::ifstream file1( pointFile );
   
@@ -303,28 +389,12 @@ int main(int argc, char **argv)
   delete dists;
   delete kdTree;
 
-//   std::ifstream file2 ( edgeFile );
-//   i = 0;
-//   k = 0;
-//   while ( std::getline(file2, line) )
-//   {
-//     std::istringstream iss(line);
-//     for (k = 0; k < K; k++) {
-//       iss >> edgesIn[i*K+k];
-//       edgesOut[i*K+k] = edgesIn[i*K+k];
-//     }
-//     i++;
-//   }
-//   file2.close();
-
   if(discrete) {
     createTemplate(referenceShape, 1, 2, steps);
     prune_discrete<<<gridSize, blockSize>>>(N, D, K, steps, x, edgesIn, edgesOut, referenceShape);
-    outputFilename = "/home/maljovec/projects/active/ngl/edges_2D_gpu_discrete.txt";
   }
   else {
-    prune<<<gridSize, blockSize>>>(N, D, K, steps, x, edgesIn, edgesOut, 2, 1);
-    outputFilename = "/home/maljovec/projects/active/ngl/edges_2D_gpu.txt";
+    prune<<<gridSize, blockSize>>>(N, D, K, x, edgesIn, edgesOut, lp, beta);
   }
 
   cudaError_t err = cudaGetLastError();
@@ -333,11 +403,10 @@ int main(int argc, char **argv)
 
   cudaDeviceSynchronize();
   
-  std::ofstream file5 (outputFilename);
   for(i = 0; i < N; i++) {
     for(k = 0; k < K; k++) {
       if (edgesOut[i*K+k] != -1) {
-        file5 << i << " " << edgesOut[i*K+k] << std::endl;
+        std::cout << i << " " << edgesOut[i*K+k] << std::endl;
       }
     }
   }
@@ -346,6 +415,9 @@ int main(int argc, char **argv)
   cudaFree(x);
   cudaFree(edgesIn);
   cudaFree(edgesOut);
+  if(discrete) {
+    cudaFree(referenceShape);;
+  }
 
   return 0;
 }
