@@ -13,7 +13,7 @@ algorithms = ['base','omp','numba','gpu', 'gpu_discrete']
 edges = {}
 eset = {}
 for alg in algorithms:
-    edges[alg] = np.loadtxt('edges_{}D_{}.txt'.format(D, alg), dtype=int)
+    edges[alg] = np.loadtxt('data/output/edges_{}D_{}.txt'.format(D, alg), dtype=int)
     eset[alg] = set()
     
     for edge in edges[alg]:

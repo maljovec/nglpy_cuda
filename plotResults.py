@@ -7,7 +7,7 @@ draw_circles = True
 draw_edges = False
 annotate = False
 
-X = np.loadtxt('data_2_{}_0.csv'.format(sys.argv[1]))
+X = np.loadtxt('data/input/data_2_{}_0.csv'.format(sys.argv[1]))
 
 draw = {'base': False,
         'omp': False,
@@ -25,7 +25,7 @@ edges = {}
 eset = {}
 for alg in algorithms:
     if alg == 'base' or draw[alg]:
-        edges[alg] = np.loadtxt('edges_2D_{}.txt'.format(alg), dtype=int)
+        edges[alg] = np.loadtxt('data/output/edges_2D_{}.txt'.format(alg), dtype=int)
         eset[alg] = set()
         
         for edge in edges[alg]:
