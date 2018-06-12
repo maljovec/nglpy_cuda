@@ -34,7 +34,10 @@ for alg in algorithms[1:]:
     eset_test = eset[alg]
     v1 = len(eset_base.difference(eset_test))
     v2 = len(eset_test.difference(eset_base))
-    print('Difference base vs {0}:\n         base only {1}\n {0:>12} only {2}'.format(alg, v1, v2))
+    if v1+v2 > 0:
+        print('Difference base vs {0}:\n         base only {1}\n {0:>12} only {2}'.format(alg, v1, v2))
+    else: 
+        print('No Difference base vs {0}'.format(alg))
 
 # print('='*80)
 # print(eset['numba'].difference(eset_base))
