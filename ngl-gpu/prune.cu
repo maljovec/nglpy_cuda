@@ -5,8 +5,22 @@
 #include <vector>
 #include <map>
 #include <algorithm>
-
 #include <ANN/ANN.h>
+
+# include <sys/time.h>
+# include <unistd.h>
+  typedef struct timeval timestamp;
+  static inline float operator - (const timestamp &t1, const timestamp &t2)
+  {
+	return (float)(t1.tv_sec  - t2.tv_sec) +
+	       1.0e-6f*(t1.tv_usec - t2.tv_usec);
+  }
+  static inline timestamp now()
+  {
+	timestamp t;
+	gettimeofday(&t, NULL);
+	return t;
+  }
 
 class CommandLine {
 	std::vector<std::string> argnames;
@@ -84,11 +98,11 @@ void prune_discrete(const int N, const int D, const int K, const int steps,
     // References to points in X
     float *p, *q, *r;
 
-    //TODO: Fix this
+    //TODO: Fix this to be dynamically allocated
     // Computed vectors representing the edge under test pq and the vector from
     // one end point to a third point r (We will iterate over all possible r's)
-    float pq[2] = {};
-    float pr[2] = {};
+    float pq[10] = {};
+    float pr[10] = {};
 
     // Different iterator/indexing variables i, j, and n are rows in X
     // representing p, q, and r, respectively
@@ -166,8 +180,8 @@ void prune(const int N, const int D, const int K, float *X, int *edgesIn,
     
     float *p, *q, *r;
 
-    float pq[2] = {};
-    float pr[2] = {};
+    float pq[10] = {};
+    float pr[10] = {};
 
     int i, j, k, k2, d, n;
     float t;
@@ -290,7 +304,8 @@ void createTemplate(float * data, float beta=1, int p=2, int steps=100) {
 
 int main(int argc, char **argv)
 {
-
+  timestamp t1 = now();
+  timestamp t2;
   CommandLine cl;
   cl.addArgument("-i", "input", "Input points", true);
   cl.addArgument("-d", "2", "Number of dimensions", true);
@@ -333,17 +348,11 @@ int main(int argc, char **argv)
   dim3 blockSize(32, 32);
   dim3 gridSize(4, 4);
 
+  std::cerr << "Grid Size: " << gridSize.x << "x" << gridSize.y << std::endl
+            << "Block Size: " << blockSize.x << "x" << blockSize.y << std::endl;
   int i, d, k;
 
   std::string outputFilename;
-
-  ANNpointArray dataPts;
-  ANNpoint queryPt;
-  ANNidxArray nnIdx;
-  ANNdistArray dists;
-  ANNkd_tree* kdTree;
-
-  dataPts = annAllocPts(N, D);
 
   cudaMallocManaged(&x, N*D*sizeof(float));
   cudaMallocManaged(&edgesIn, N*K*sizeof(int));
@@ -351,6 +360,10 @@ int main(int argc, char **argv)
   if(discrete) {
     cudaMallocManaged(&referenceShape, (steps+1)*sizeof(float));
   }
+
+  t2 = now();
+  std::cerr << "Setup and Memory Allocation " << t2-t1 << " s" << std::endl;
+  t1 = now();
 
   std::ifstream file1( pointFile );
   
@@ -363,31 +376,62 @@ int main(int argc, char **argv)
     std::istringstream iss(line);
     for (d = 0; d < D; d++) {
       iss >> x[i*D+d];
-      dataPts[i][d] = x[i*D+d];
+    //   dataPts[i][d] = x[i*D+d];
     }
     i++;
   }
   file1.close();
+  t2 = now();
+  std::cerr << "Reading Data " << t2-t1 << " s" << std::endl;
+  t1 = now();
   
-  kdTree = new ANNkd_tree(dataPts, N, D);
-  queryPt = annAllocPt(D);
-  nnIdx = new ANNidx[K];
-  dists = new ANNdist[K];
-  for(i = 0; i < N; i++) {
-    for(d = 0; d < D; d++) {
-        queryPt[d] = x[i*D+d];
-    }
-    kdTree->annkSearch(queryPt, K, nnIdx, dists, 0.f);
-    for(int k=0;k<K;k++) {
-        edgesOut[i*K+k] = edgesIn[i*K+k] = nnIdx[k];
-    }
-  }
+  std::stringstream ss;
 
-  annDeallocPts(dataPts);
-  annDeallocPt(queryPt);
-  delete nnIdx;
-  delete dists;
-  delete kdTree;
+  ss << "../data/misc/knn_" << D << "D_" << N << ".txt";
+  std::string edgeFile = ss.str();
+
+  std::ifstream file2 ( edgeFile );
+  i = 0;
+  while ( std::getline(file2, line) )
+  {
+      std::istringstream iss(line);
+      for (k = 0; k < K; k++) {
+          iss >> edgesIn[i*K+k];
+          edgesOut[i*K+k] = edgesIn[i*K+k];
+      }
+      i++;
+  }
+  file2.close();
+
+//   ANNpointArray dataPts;
+//   ANNpoint queryPt;
+//   ANNidxArray nnIdx;
+//   ANNdistArray dists;
+//   ANNkd_tree* kdTree;
+
+//   dataPts = annAllocPts(N, D);
+//   kdTree = new ANNkd_tree(dataPts, N, D);
+//   queryPt = annAllocPt(D);
+//   nnIdx = new ANNidx[K];
+//   dists = new ANNdist[K];
+//   for(i = 0; i < N; i++) {
+//     for(d = 0; d < D; d++) {
+//         queryPt[d] = x[i*D+d];
+//     }
+//     kdTree->annkSearch(queryPt, K, nnIdx, dists, 0.f);
+//     for(int k=0;k<K;k++) {
+//         edgesOut[i*K+k] = edgesIn[i*K+k] = nnIdx[k];
+//     }
+//   }
+
+//   annDeallocPts(dataPts);
+//   annDeallocPt(queryPt);
+//   delete nnIdx;
+//   delete dists;
+//   delete kdTree;cd ..
+  t2 = now();
+  std::cerr << "ANN computation " << t2-t1 << " s" << std::endl;
+  t1 = now();
 
   if(discrete) {
     createTemplate(referenceShape, 1, 2, steps);
@@ -402,7 +446,10 @@ int main(int argc, char **argv)
       printf("Error: %s\n", cudaGetErrorString(err));
 
   cudaDeviceSynchronize();
-  
+  t2 = now();
+  std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;
+  t1 = now();
+
   for(i = 0; i < N; i++) {
     for(k = 0; k < K; k++) {
       if (edgesOut[i*K+k] != -1) {
@@ -416,8 +463,11 @@ int main(int argc, char **argv)
   cudaFree(edgesIn);
   cudaFree(edgesOut);
   if(discrete) {
-    cudaFree(referenceShape);;
+    cudaFree(referenceShape);
   }
+
+  t2 = now();
+  std::cerr << "Output and Clean-up " << t2-t1 << " s" << std::endl;
 
   return 0;
 }
