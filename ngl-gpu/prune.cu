@@ -387,7 +387,7 @@ int main(int argc, char **argv)
   
   std::stringstream ss;
 
-  ss << "../data/misc/knn_" << D << "D_" << N << ".txt";
+  ss << "../data/misc/knn_" << D << "D.txt";
   std::string edgeFile = ss.str();
 
   std::ifstream file2 ( edgeFile );
@@ -458,6 +458,10 @@ int main(int argc, char **argv)
     }
   }
 
+  t2 = now();
+  std::cerr << "Output " << t2-t1 << " s" << std::endl;
+  t1 = now();
+
   // Free memory
   cudaFree(x);
   cudaFree(edgesIn);
@@ -467,7 +471,7 @@ int main(int argc, char **argv)
   }
 
   t2 = now();
-  std::cerr << "Output and Clean-up " << t2-t1 << " s" << std::endl;
+  std::cerr << "Clean-up " << t2-t1 << " s" << std::endl;
 
   return 0;
 }
