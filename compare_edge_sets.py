@@ -13,18 +13,17 @@ algorithms = ['base',
               'omp',
               'numba',
               'gpu',
-              'gpu_discrete']
+              'gpu_discrete'
+              ]
 
-edges = {}
-eset = {}
-toRemove = []
 for alg in algorithms:
     fname = 'data/output/edges_{}D_{}.txt'.format(D, alg)
     if os.path.isfile(fname):
-        edges[alg] = np.loadtxt(fname, dtype=int)
-        eset[alg] = set()
-        
-        for edge in edges[alg]:
+        eset = set()
+
+        fptr = open(fname)
+        for line in fptr:
+            edge = list(map(int, line.split(' ')))
             if edge[1] < edge[0]:
                 lo = edge[1]
                 hi = edge[0]
@@ -33,23 +32,19 @@ for alg in algorithms:
                 hi = edge[1]
             
             if lo != hi:
-                eset[alg].add((lo,hi))
+                eset.add((lo,hi))
         
-        print('{:>12}: {}'.format(alg, len(eset[alg])))
+        print('{:>12}: {}'.format(alg, len(eset)))
+
+        if alg == 'base':
+            eset_base = set(eset)
+        else:
+            v1 = len(eset_base.difference(eset))
+            v2 = len(eset.difference(eset_base))
+            if v1+v2 > 0:
+                print('Difference base vs {0}:\n         base only {1}\n {0:>12} only {2}'.format(alg, v1, v2))
+            else: 
+                print('No Difference base vs {0}'.format(alg))
     else:
-        toRemove.append(alg)
-
-for alg in toRemove:
-    algorithms.remove(alg)
-
-print('~ '*40)
-
-eset_base = eset['base']
-for alg in algorithms[1:]:
-    eset_test = eset[alg]
-    v1 = len(eset_base.difference(eset_test))
-    v2 = len(eset_test.difference(eset_base))
-    if v1+v2 > 0:
-        print('Difference base vs {0}:\n         base only {1}\n {0:>12} only {2}'.format(alg, v1, v2))
-    else: 
-        print('No Difference base vs {0}'.format(alg))
+        print('No data for {}'.format(alg))
+    print('~ '*40)
