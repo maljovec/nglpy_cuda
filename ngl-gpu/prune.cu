@@ -309,7 +309,8 @@ int main(int argc, char **argv)
   CommandLine cl;
   cl.addArgument("-i", "input", "Input points", true);
   cl.addArgument("-d", "2", "Number of dimensions", true);
-  cl.addArgument("-n", "1000000", "Number of points", true);
+  cl.addArgument("-c", "1000000", "Number of points", true);
+  cl.addArgument("-n", "neighbor", "Neighbor edge file", true);
   cl.addArgument("-k", "-1", "K max", false);
   cl.addArgument("-b", "1.0", "Beta", false);
   cl.addArgument("-p", "2.0", "Lp-norm", false);
@@ -331,7 +332,7 @@ int main(int argc, char **argv)
 
   std::string pointFile = cl.getArgString("-i");
   int D = cl.getArgInt("-d");
-  int N = cl.getArgInt("-n");
+  int N = cl.getArgInt("-c");
   int K = cl.getArgInt("-k");
   int steps = cl.getArgInt("-s");
   bool discrete = steps > 0;
@@ -385,10 +386,7 @@ int main(int argc, char **argv)
   std::cerr << "Reading Data " << t2-t1 << " s" << std::endl;
   t1 = now();
   
-  std::stringstream ss;
-
-  ss << "../data/misc/knn_" << D << "D.txt";
-  std::string edgeFile = ss.str();
+  std::string edgeFile = cl.getArgString("-n");
 
   std::ifstream file2 ( edgeFile );
   i = 0;
