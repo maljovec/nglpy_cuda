@@ -1,2 +1,3 @@
 data/*
 prune_graph
+*.out

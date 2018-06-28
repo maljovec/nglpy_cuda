@@ -5,15 +5,15 @@ import sys
 
 draw_circles = True
 draw_edges = False
-annotate = False
+annotate = True
 
-X = np.loadtxt('data/input/data_2_{}_0.csv'.format(sys.argv[1]))
+X = np.loadtxt('data/input/points_uniform_{}_2_0.csv'.format(sys.argv[1]))
 
 draw = {'base': False,
         'omp': False,
-        'numba': False,
+        'numba': True,
         'gpu': False,
-        'gpu_discrete': True}
+        'gpu_discrete': False}
 
 algorithms = { 'base': '#6598D0',
                 'omp': '#15737C',
@@ -25,9 +25,9 @@ edges = {}
 eset = {}
 for alg in algorithms:
     if alg == 'base' or draw[alg]:
-        edges[alg] = np.loadtxt('data/output/edges_2D_{}.txt'.format(alg), dtype=int)
+        edges[alg] = np.loadtxt('data/output/{}_uniform_{}_2_5_0.txt'.format(alg, sys.argv[1]), dtype=int)
         eset[alg] = set()
-        
+
         for edge in edges[alg]:
             if edge[1] < edge[0]:
                 lo = edge[1]
@@ -35,10 +35,10 @@ for alg in algorithms:
             else:
                 lo = edge[0]
                 hi = edge[1]
-            
+
             if lo != hi:
                 eset[alg].add((lo,hi))
-        
+
         print('{:>12}: {}'.format(alg, len(eset[alg])))
 
 eset_base = eset['base']
@@ -51,7 +51,7 @@ for alg in algorithms:
     v2 = len(eset_test.difference(eset_base))
     if v1+v2 > 0:
         print('Difference base vs {0}:\n         base only {1}\n {0:>12} only {2}'.format(alg, v1, v2))
-    else: 
+    else:
         print('No Difference base vs {0}'.format(alg))
 
 fig, ax = plt.subplots()
