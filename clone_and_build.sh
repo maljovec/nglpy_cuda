@@ -12,6 +12,42 @@ rm -rf ${build_file}base.txt ${build_file}omp.txt ${build_file}numba.txt ${build
 #   rm -rf ngl-base ngl-omp ngl-numba
 # fi
 ################################################################################
+echo "===== Updating and building knn-generator ====="
+start=$(date +%s)
+if [ ! -d knn-generator ]
+then
+    echo "===== Cloning =====" &> ${build_file}knn.txt
+    git clone git@bitbucket.org:dmaljovec/ngl-beta.git knn-generator &>> ${build_file}knn.txt
+fi
+echo "===== Updating =====" &>> ${build_file}knn.txt
+pushd knn-generator &>> ${build_file}knn.txt
+git checkout knn_generator &>> ${build_file}knn.txt
+git pull &>> ${build_file}knn.txt
+echo "===== Building =====" &>> ${build_file}knn.txt
+cmake . &>> ${build_file}knn.txt
+make &>> ${build_file}knn.txt
+popd > /dev/null
+end=$(date +%s)
+let "diff=$end-$start"
+echo "$diff seconds"
+
+echo "===== Updating and building cvt ====="
+start=$(date +%s)
+if [ ! -d cvt ]
+then
+    echo "===== Cloning =====" &> ${build_file}cvt.txt
+    git clone git@bitbucket.org:dmaljovec/cvt.git cvt &>> ${build_file}cvt.txt
+fi
+echo "===== Updating =====" &>> ${build_file}cvt.txt
+pushd cvt &>> ${build_file}cvt.txt
+git pull &>> ${build_file}cvt.txt
+echo "===== Building =====" &>> ${build_file}cvt.txt
+make &>> ${build_file}cvt.txt
+popd > /dev/null
+end=$(date +%s)
+let "diff=$end-$start"
+echo "$diff seconds"
+
 echo "===== Updating and building ngl-base ====="
 start=$(date +%s)
 if [ ! -d ngl-base ]
