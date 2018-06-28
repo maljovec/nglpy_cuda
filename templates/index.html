@@ -96,7 +96,7 @@
             <p>
                 <input type="range" id="steps_slider" name="steps" min="10" max="1000" value="100" step="10" oninput="updateSteps()" />
             </p>
-            <svg id="templateShape">
+            <svg id="templateShape" style="height: 200px; width: 200px;">
                     <polygon class="polygon"></polygon>
                 </svg>
             <p>Compute Time:
@@ -179,6 +179,9 @@
 
         console.log('sending request to /sample');
 
+        canvas = d3.select("#ergCanvas");
+        canvas.selectAll('.point').remove();
+        canvas.selectAll('.edge').remove();
         d3.request("/sample")
             .header("Content-Type", "application/json")
             .post(JSON.stringify(data), function (error, data) {
@@ -192,7 +195,7 @@
                     for (var i = 0; i < text.length; i++) {
                         points[i] = parseFloat(text[i]);
                     }
-                    // updateEdges();
+                    updateEdges();
                     plotPoints();
                 }
                 else {
@@ -224,6 +227,8 @@
             "g_type": graph, "k": k, "beta": beta, "p": pNorm, "steps": steps
         };
 
+        canvas = d3.select("#ergCanvas");
+        canvas.selectAll('.edge').remove();
         d3.request("/graph")
             .header("Content-Type", "application/json")
             .post(JSON.stringify(data), function (error, data) {
@@ -358,7 +363,20 @@
             pNorm = parseFloat(newValue);
             document.getElementById("p").innerHTML = newValue;
         }
+        updateTemplate(pNorm, templateSize);
         updateEdges();
+    }
+
+    function updateTemplate(pNorm, templateSize){
+        graph = document.getElementById('graph_dropdown').value;
+
+        d3.select(".polygon").selectAll("*").remove();
+        if (graph == 'knn') { return; }
+
+        var template = pNormShape(pNorm, templateSize/2, templateSize/2,
+                                templateSize/2. - padding);
+        console.log(pointsToString(template));
+        d3.select(".polygon").attr("points", pointsToString(template));
     }
 
     function plotPoints() {
@@ -456,6 +474,7 @@
     document.getElementById("steps").innerHTML = steps;
 
     constructGrid(d3.select("#ergCanvas"), graphSize, graphSize);
+    updateTemplate(pNorm, templateSize);
     updateCount();
     updateGraph();
     updateDiscrete();
