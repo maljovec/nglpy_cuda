@@ -1,3 +1,4 @@
+#! /home/maljovec/anaconda3/bin/python
 import numpy as np
 import argparse
 import pyDOE
@@ -23,7 +24,7 @@ if args.strategy == 'uniform':
 elif args.strategy == 'normal':
     X = np.clip(np.random.normal(loc=0.5, scale=0.1, size=(N,D)), 0, 1)
 elif args.strategy == 'cvt':
-    result = subprocess.run(['../cvt/createCVT', '-N', '{}'.format(N), '-D',
+    result = subprocess.run(['cvt/createCVT', '-N', '{}'.format(N), '-D',
                              '{}'.format(D), '-seed', '{}'.format(args.seed),
                              '-ann', '1', '-iterations', '1000000'],
                              stdout=subprocess.PIPE)

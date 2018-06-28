@@ -1,0 +1,119 @@
+    body {
+        background: #333;
+        color: #ccc;
+        display: flex;
+    }
+
+    :root
+    {
+        /* For highlighted items */
+        --highlight-color: #c33;
+        --highlight-opacity: 0.75;
+
+        /* For foreground items that are not highlighted */
+        --active-color: #fff;
+        --active-opacity: 0.5;
+
+        /* For background items or disabled pieces */
+        --inactive-color: #666;
+        --inactive-opacity: 0.25;
+
+        --templateSize: 100;
+        --graphSize: 600;
+    }
+
+    #templateShape
+    {
+        display: "block";
+        margin: "auto";
+        width: var(--templateSize);
+        height: var(--templateSize);
+    }
+
+    #templateShape .polygon
+    {
+        stroke-width: 2px;
+        stroke: var(--highlight-color);
+        fill: var(--highlight-color);
+        fill-opacity: var(--highlight-opacity);
+    }
+
+    .graph
+    {
+        stroke-width: 2px;
+        stroke: var(--highlight-color);
+        fill: none;
+    }
+
+    .axis
+    {
+        stroke: var(--active-color);
+        stroke-opacity: 1;
+        /* stroke-dasharray: 10,5; */
+        stroke-width: 3;
+    }
+
+    .grid
+    {
+        stroke: var(--inactive-color);
+        stroke-opacity: var(--inactive-opacity);
+        shape-rendering: crispEdges;
+    }
+
+    .circle
+    {
+        fill: var(--inactive-color);
+        fill-opacity: 0;
+        stroke: var(--active-color);
+        stroke-opacity: var(--inactive-opacity);
+    }
+
+    .point
+    {
+        fill: var(--active-color);
+        stroke-width: 0px;
+    }
+
+    .query
+    {
+        fill: var(--active-color);
+        stroke-width: 0px;
+    }
+
+    .guidePoint
+    {
+        fill: var(--active-color);
+        fill-opacity: var(--inactive-opacity);
+        stroke-width: 0px;
+    }
+
+    .edge
+    {
+        fill: var(--active-color);
+        stroke: var(--active-color);
+        stroke-width: 2px;
+        stroke-opacity: 1;
+    }
+
+    .face
+    {
+        stroke-width: 0px;
+        fill: var(--inactive-color);
+        fill-opacity: var(--inactive-opacity);
+    }
+
+    .hidden
+    {
+        display: none;
+        visibility: hidden;
+    }
+
+    #controls
+    {
+        flex: 25%;
+    }
+
+    #graph
+    {
+        flex: 75%;
+    }
