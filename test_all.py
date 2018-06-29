@@ -4,10 +4,10 @@ import sys
 import time
 # python test_all.py > test.out
 
-
+knn_program = 'knn-generator/binsrc/getNeighborGraph'
 algorithms = ['base', 'omp', 'numba']  # , 'gpu', 'gpud']
 
-print('Dimension, Seed, Sampling, Point_Count, #_Neighbors, Algorithm, Time, ' +
+print('Dimension, Seed, Sampling, Point_Count, #_Neighbors, Algorithm, Time, '
       'Total_Edge_Count, Missed_Edge_Count, Additional_Edge_Count')
 for N in [1000000]:
     for D in range(7, 10):
@@ -23,35 +23,34 @@ for N in [1000000]:
                     K = 500
 
                 K = min(K, N)
-                p_filename = 'data/input/points_{}_{}_{}_{}.csv'.format(
-                    A, N, D, S)
-                k_filename = 'data/graphs/knn_{}_{}_{}_{}.txt'.format(
-                    A, N, D, S)
+                p_file = 'data/input/points_{}_{}_{}_{}.csv'.format(A, N, D, S)
+                k_file = 'data/graphs/knn_{}_{}_{}_{}.txt'.format(A, N, D, S)
 
                 # Generate Point Set
-                if not os.path.exists(p_filename) or not os.stat(p_filename).st_size:
-                    sys.stderr.write(p_filename + ' generation: ')
+                if not os.path.exists(p_file) or not os.stat(p_file).st_size:
+                    sys.stderr.write(p_file + ' generation: ')
                     sys.stderr.flush()
                     start = time.time()
-                    result = subprocess.run(['python', 'generate_sample_set.py',
+                    result = subprocess.run(['python',
+                                             'generate_sample_set.py',
                                              str(D), str(S), str(N), str(A),
-                                             p_filename],
-                                             stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE, check=True)
+                                             p_file],
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE, check=True)
                     end = time.time()
                     sys.stderr.write('{} s\n'.format(end-start))
 
                 # Generate Graph to Prune
-                if not os.path.exists(k_filename) or not os.stat(k_filename).st_size:
-                    sys.stderr.write(k_filename + ' generation: ')
+                if not os.path.exists(k_file) or not os.stat(k_file).st_size:
+                    sys.stderr.write(k_file + ' generation: ')
                     sys.stderr.flush()
                     start = time.time()
-                    fptr = open(k_filename, 'w')
-                    result = subprocess.run(['knn-generator/binsrc/getNeighborGraph',
+                    fptr = open(k_file, 'w')
+                    result = subprocess.run([knn_program,
                                              '-d', str(D), '-b', '1', '-k',
-                                             str(K), '-i', p_filename],
-                                             stdout=subprocess.PIPE,
-                                             stderr=fptr, check=True)
+                                             str(K), '-i', p_file],
+                                            stdout=subprocess.PIPE,
+                                            stderr=fptr, check=True)
                     fptr.close()
                     end = time.time()
                     sys.stderr.write('{} s\n'.format(end-start))
@@ -69,24 +68,24 @@ for N in [1000000]:
                 cmds['base'] = ['/usr/bin/time', '-f', '%e',
                                 'ngl-base/binsrc/getNeighborGraph', '-d',
                                 str(D), '-b', '1', '-k', str(K), '-i',
-                                p_filename, '-n', k_filename]
+                                p_file, '-n', k_file]
                 cmds['omp'] = ['/usr/bin/time', '-f', '%e',
                                'ngl-omp/binsrc/getNeighborGraph', '-d',
                                str(D), '-b', '1', '-k', str(K), '-i',
-                               p_filename, '-n', k_filename]
+                               p_file, '-n', k_file]
                 cmds['numba'] = ['/usr/bin/time', '-f', '%e', 'python',
                                  'ngl-numba/test_numpy.py', '-b', '1', '-i',
-                                 p_filename, '-n', k_filename, '-s', '9999',
+                                 p_file, '-n', k_file, '-s', '9999',
                                  '-p', '2']
                 cmds['gpud'] = ['/usr/bin/time', '-f', '%e',
                                 'ngl-gpu/prune_graph', '-d', str(D), '-b', '1',
-                                '-k', str(K), '-i', p_filename, '-n',
-                                k_filename, '-c', str(N), '-p', '2', '-s',
+                                '-k', str(K), '-i', p_file, '-n',
+                                k_file, '-c', str(N), '-p', '2', '-s',
                                 '9999']
                 cmds['gpu'] = ['/usr/bin/time', '-f', '%e',
                                'ngl-gpu/prune_graph', '-d', str(D), '-b', '1',
-                               '-k', str(K), '-i', p_filename, '-n',
-                               k_filename, '-c', str(N), '-p', '2', '-s', '-1']
+                               '-k', str(K), '-i', p_file, '-n',
+                               k_file, '-c', str(N), '-p', '2', '-s', '-1']
 
                 # Run the algorithms
                 for alg in algorithms:
@@ -102,8 +101,8 @@ for N in [1000000]:
                     times[alg] = float(result.stderr.decode(
                         'utf-8').strip().split('\n')[-1])
 
-                os.remove(p_filename)
-                # os.remove(k_filename)
+                os.remove(p_file)
+                # os.remove(k_file)
                 # Count the total number of edges and the differences between
                 # the base algorithm and the others
                 counts = {}
@@ -136,8 +135,10 @@ for N in [1000000]:
                             base_only[alg] = 0
                             other_only[alg] = 0
                         else:
-                            base_only[alg] = 'na' #len(eset_base.difference(eset))
-                            other_only[alg] = 'na' #len(eset.difference(eset_base))
+                            # base_only[alg] = len(eset_base.difference(eset))
+                            # other_only[alg] = len(eset.difference(eset_base))
+                            base_only[alg] = 'na'
+                            other_only[alg] = 'na'
                     end = time.time()
                     sys.stderr.write('{} s\n'.format(end-start))
 

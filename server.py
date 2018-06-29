@@ -5,7 +5,7 @@
 
 from flask import Flask, render_template, request, jsonify
 import numpy as np
-import os
+# import os
 import subprocess
 import json
 import time
@@ -30,8 +30,8 @@ s_type = 'uniform'
 g_type = 'knn'
 # ######################################################################
 # Dynamically computed constants
-p_filename = 'data/input/points_{}_{}_{}_{}.csv'.format(s_type, N, D, seed)
-k_filename = 'data/graphs/knn_{}_{}_{}_{}.txt'.format(s_type, N, D, seed)
+p_file = 'data/input/points_{}_{}_{}_{}.csv'.format(s_type, N, D, seed)
+k_file = 'data/graphs/knn_{}_{}_{}_{}.txt'.format(s_type, N, D, seed)
 X = np.zeros((N, D))
 # ######################################################################
 
@@ -52,16 +52,18 @@ def makeData():
         seed = int(params['seed'])
         s_type = params['s_type']
 
-        p_filename = 'data/input/points_{}_{}_{}_{}.csv'.format(s_type, N, D,
-                                                                seed)
-
-        if not os.path.isfile(p_filename):
+        p_file = 'data/input/points_{}_{}_{}_{}.csv'.format(s_type, N, D,
+                                                            seed)
+        # if not (os.path.isfile(p_file) and not os.stat(e_file).st_size):
+        if True:
             result = subprocess.run(['python', sample_program, str(D),
-                                     str(seed), str(N), s_type, p_filename],
+                                     str(seed), str(N), s_type, p_file],
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, check=True)
-        X = np.loadtxt(p_filename)
+            print(result.args)
+        X = np.loadtxt(p_file)
         end = time.time()
+        print(p_file)
         return jsonify({'data': json.dumps(X.tolist(), separators=(',', ':')),
                         'time': '{:6.4f} s'.format(end-start)})
 
@@ -86,22 +88,27 @@ def computeGraph():
             g_type += 'd'
 
         K = min(K, N)
-        k_filename = 'data/graphs/knn_{}_{}_{}_{}_{}.txt'.format(s_type, N, D,
-                                                                 K, seed)
-        e_filename = 'data/output/{}_{}_{}_{}_{}_{}.txt'.format(g_type, s_type,
-                                                                N, D, K, seed)
+        p_file = 'data/input/points_{}_{}_{}_{}.csv'.format(s_type, N, D,
+                                                            seed)
+        k_file = 'data/graphs/knn_{}_{}_{}_{}_{}.txt'.format(s_type, N, D,
+                                                             K, seed)
+        e_file = 'data/output/{}_{}_{}_{}_{}_{}.txt'.format(g_type, s_type,
+                                                            N, D, K, seed)
         edge_set = set()
-        if not os.path.isfile(e_filename) or not os.stat(e_filename).st_size:
-            if not os.path.isfile(k_filename) or not os.stat(k_filename).st_size:
-                fptr = open(k_filename, 'w')
+        # if not (os.path.isfile(e_file) and os.stat(e_file).st_size):
+        if True:
+            # if not (os.path.isfile(k_file) and os.stat(k_file).st_size):
+            if True:
+                fptr = open(k_file, 'w')
                 result = subprocess.run([knn_program, '-d', str(D), '-b', '1',
-                                         '-k', str(K), '-i', p_filename],
+                                         '-k', str(K), '-i', p_file],
                                         stdout=subprocess.PIPE, stderr=fptr,
                                         check=True)
+                print(result.args)
                 fptr.close()
 
             if g_type == 'knn':
-                edges = np.atleast_2d(np.loadtxt(k_filename, dtype=int))
+                edges = np.atleast_2d(np.loadtxt(k_file, dtype=int))
                 if (edges.shape[0] == 1):
                     edges = edges.T
                 for i, row in enumerate(edges):
@@ -113,16 +120,17 @@ def computeGraph():
             else:
                 cmd = ['/usr/bin/time', '-f', '%e',
                        skeleton_program[g_type], '-d', str(D), '-b',
-                       str(beta),  '-k', str(K), '-i', p_filename, '-n',
-                       k_filename, '-c', str(N), '-p', str(p), '-s',
+                       str(beta),  '-k', str(K), '-i', p_file, '-n',
+                       k_file, '-c', str(N), '-p', str(p), '-s',
                        str(steps)]
-                fptr = open(e_filename, 'w')
+                fptr = open(e_file, 'w')
                 result = subprocess.run(cmd, stdout=fptr,
                                         stderr=subprocess.PIPE)
                 fptr.close()
-                print(result.returncode, result.stderr)
+                print(result.args)
+                print(result.returncode, result.stderr.decode('utf-8'))
 
-                fptr = open(e_filename)
+                fptr = open(e_file)
                 for line in fptr:
                     edge = list(map(int, line.split(' ')))
                     lo = min(edge)
@@ -131,7 +139,7 @@ def computeGraph():
                         edge_set.add((lo, hi))
                 fptr.close()
         else:
-            edges = np.atleast_2d(np.loadtxt(e_filename, dtype=int))
+            edges = np.atleast_2d(np.loadtxt(e_file, dtype=int))
             for edge in edges:
                 lo = min(edge)
                 hi = max(edge)
@@ -142,6 +150,7 @@ def computeGraph():
         for e in edge_set:
             edges += '{},{};'.format(e[0], e[1])
         end = time.time()
+        print(e_file)
         return jsonify({'edges': edges,
                         'time': '{:6.4f} s'.format(end-start)})
 

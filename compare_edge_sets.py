@@ -1,8 +1,9 @@
 import numpy as np
-import argparse 
+import argparse
 import os.path
 
-parser = argparse.ArgumentParser(description='Build an lp-beta skeleton using numba.')
+parser = argparse.ArgumentParser(
+    description='Build an lp-beta skeleton using numba.')
 parser.add_argument('dimensionality', type=int,
                     help='The dimensionality of the problem to handle.')
 
@@ -30,10 +31,10 @@ for alg in algorithms:
             else:
                 lo = edge[0]
                 hi = edge[1]
-            
+
             if lo != hi:
-                eset.add((lo,hi))
-        
+                eset.add((lo, hi))
+
         print('{:>12}: {}'.format(alg, len(eset)))
 
         if alg == 'base':
@@ -42,8 +43,10 @@ for alg in algorithms:
             v1 = len(eset_base.difference(eset))
             v2 = len(eset.difference(eset_base))
             if v1+v2 > 0:
-                print('Difference base vs {0}:\n         base only {1}\n {0:>12} only {2}'.format(alg, v1, v2))
-            else: 
+                print('Difference base vs {}:'.format(alg))
+                print(' {:>12} only {}'.format('base', v1))
+                print(' {:>12} only {}'.format(alg, v2))
+            else:
                 print('No Difference base vs {0}'.format(alg))
     else:
         print('No data for {}'.format(alg))

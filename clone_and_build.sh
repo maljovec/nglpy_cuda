@@ -33,13 +33,13 @@ echo "$diff seconds"
 
 echo "===== Updating and building cvt ====="
 start=$(date +%s)
-if [ ! -d cvt ]
+if [ ! -d samplers/cvt ]
 then
     echo "===== Cloning =====" &> ${build_file}cvt.txt
-    git clone git@bitbucket.org:dmaljovec/cvt.git cvt &>> ${build_file}cvt.txt
+    git clone git@bitbucket.org:dmaljovec/cvt.git samplers/cvt &>> ${build_file}cvt.txt
 fi
 echo "===== Updating =====" &>> ${build_file}cvt.txt
-pushd cvt &>> ${build_file}cvt.txt
+pushd samplers/cvt &>> ${build_file}cvt.txt
 git pull &>> ${build_file}cvt.txt
 echo "===== Building =====" &>> ${build_file}cvt.txt
 make &>> ${build_file}cvt.txt
