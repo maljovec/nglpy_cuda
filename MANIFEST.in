@@ -3,6 +3,10 @@ include CONTRIBUTING.rst
 include HISTORY.rst
 include LICENSE
 include README.rst
+include src/ngl_cuda.cu
+include src/core.cpp
+include include/ngl_cuda.cuh
+include include/ngl_cuda.h
 
 recursive-include tests *
 recursive-exclude * __pycache__

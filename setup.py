@@ -3,7 +3,7 @@
 
 """The setup script."""
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -11,11 +11,14 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = [ ]
+requirements = []
 
 setup_requirements = ['pytest-runner', ]
 
 test_requirements = ['pytest', ]
+
+ngl_cuda_core = Extension('ngl_cuda.core', sources=['src/core.cpp'],
+                          include_dirs=['include'], libraries=['ngl_cuda'])
 
 setup(
     author="Daniel Patrick Maljovec",
@@ -46,4 +49,6 @@ setup(
     url='https://github.com/maljovec/nglpy_cuda',
     version='0.1.0',
     zip_safe=False,
+    ext_modules=[],
+    packages=['ngl_cuda']
 )
