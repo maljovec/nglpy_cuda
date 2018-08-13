@@ -1,5 +1,5 @@
 #include "ngl_cuda.cuh"
-#include <cstdio>
+#include <iostream>
 #include <vector>
 #include <map>
 #include <algorithm>
@@ -13,6 +13,10 @@ inline void GPUAssert(cudaError_t code, const char *file, int line,
 		if (abort) exit(code);
 	}
 }
+
+namespace nglcu {
+  dim3 block_size(32, 32);
+  dim3 grid_size(4, 4); 
 
 __global__
 void prune_discrete_d(float *X, int *edgesIn, const int N, const int D,
@@ -209,7 +213,7 @@ float min_distance_from_edge(float t, float beta, float p) {
     return 0.5*y;
 }
 
-void create_template(float * data, float beta=1, int p=2, int steps=100) {
+void create_template(float * data, float beta, int p, int steps) {
     if (p < 0) {
         if (beta >= 1) {
             for (int i = 0; i <= steps; i++) {
@@ -224,20 +228,20 @@ void create_template(float * data, float beta=1, int p=2, int steps=100) {
     }
     else {
         for (int i = 0; i <= steps; i++) {
-            data[i] = minDistanceFromEdge(float(i)/steps, beta, p);
+            data[i] = min_distance_from_edge(float(i)/steps, beta, p);
         }
     }
 }
 
-void prune_discrete(float *X, int *edges, const int N, const int D,
-                    const int K, const int steps, float beta, float p) {
+void prune_discrete(const int N, const int D, const int K, const int steps,
+	            const float beta, const float p, float *X, int *edges) {
     float erTemplate[steps];
-    create_template(&erTemplate, beta, p, steps);
-    return prune_discrete(X, edges, N, D, K, steps, erTemplate);
+    create_template(erTemplate, beta, p, steps);
+    return prune_discrete(N, D, K, steps, erTemplate, X, edges);
 }
 
-void prune_discrete(float *X, int *edges, const int N, const int D,
-                    const int K, const int steps, float *erTemplate) {
+void prune_discrete(const int N, const int D, const int K, const int steps,
+	            float *erTemplate, float *X, int *edges) {
     float *x_d;
     int *edgesIn_d;
     int *edgesOut_d;
@@ -267,8 +271,8 @@ void prune_discrete(float *X, int *edges, const int N, const int D,
     cudaFree(erTemplate_d);
 }
 
-void prune(float *X, int *edges, const int N, const int D, const int K,
-           float lp, float beta) {
+void prune(const int N, const int D, const int K, float lp, float beta,
+	   float *X, int *edges) {
     float *x_d;
     int *edgesIn_d;
     int *edgesOut_d;
@@ -292,15 +296,14 @@ void prune(float *X, int *edges, const int N, const int D, const int K,
     cudaFree(x_d);
     cudaFree(edgesIn_d);
     cudaFree(edgesOut_d);
-    cudaFree(erTemplate_d);
 }
 
 vector_edge get_edge_list(int *edges, const int N, const int K) {
     int i, k;
-    vector_edge edge_list();
+    vector_edge edge_list;
     for(i = 0; i < N; i++) {
         for(k = 0; k < K; k++) {
-            if (edgesOut[i*K+k] != -1) {
+            if (edges[i*K+k] != -1) {
                 edge_list.push_back(std::make_pair(i, edges[i*K+k]));
             }
         }
@@ -318,4 +321,5 @@ void print_cuda_info() {
 
     std::cerr << "Grid Size: " << grid_size.x << "x" << grid_size.y << std::endl
               << "Block Size: " << block_size.x << "x" << block_size.y << std::endl;
+}
 }

@@ -14,11 +14,11 @@ with open('HISTORY.rst') as history_file:
 requirements = []
 
 setup_requirements = ['pytest-runner', ]
-
 test_requirements = ['pytest', ]
 
-ngl_cuda_core = Extension('ngl_cuda.core', sources=['src/core.cpp'],
-                          include_dirs=['include'], libraries=['ngl_cuda'])
+nglpy_cuda_core = Extension('nglpy_cuda.core', sources=['nglpy_cuda/core.cpp'],
+                            include_dirs=['include'], libraries=['nglcu'],
+                            library_dirs=['.'])
 
 setup(
     author="Daniel Patrick Maljovec",
@@ -42,13 +42,12 @@ setup(
     include_package_data=True,
     keywords='nglpy_cuda',
     name='nglpy_cuda',
-    packages=find_packages(include=['nglpy_cuda']),
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/maljovec/nglpy_cuda',
     version='0.1.0',
     zip_safe=False,
-    ext_modules=[],
-    packages=['ngl_cuda']
+    ext_modules=[nglpy_cuda_core],
+    packages=['nglpy_cuda']
 )

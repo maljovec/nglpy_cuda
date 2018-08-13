@@ -1,6 +1,8 @@
 #ifndef NGLCUDA_CUH
 #define NGLCUDA_CUH
 
+#include <vector>
+
 namespace nglcu{
     typedef typename std::vector<std::pair<int, int> > vector_edge;
 
@@ -15,8 +17,6 @@ namespace nglcu{
                float *X, int *edges);
 
     void print_cuda_info();
-    dim3 block_size(32, 32);
-    dim3 grid_size(4, 4);
 }
 
 #endif //NGLCUDA_CUH
