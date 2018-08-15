@@ -35,27 +35,27 @@ Build
 
 Until I get this packaged appropriately, use the following command to compile the CUDA code:
 
-```bash
+``bash
 nvcc src/ngl_cuda.cu -I include/ --compiler-options "-fPIC" --shared -o libnglcu.so
-```
+``
 
 The CUDA API can then be tested with a small C++ example (TODO: provide small data file in repo for testing this next line):
-```bash
+``bash
 g++ -L. -I ../include/ ../src/test.cpp -lnglcu -o test
 ./test -i <input file> -d <# of dimensions> -c <# of points> -n <neighbor edge file> -k <k neighbors to prune> -b <beta parameter> -p <shape descriptor> -s <discretization steps>
-```
+``
 
 For now, don't install this yet, but set it up in development mode:
 
-```bash
+``bash
 python setup.py develop
-```
+``
 
 Run the small test script to verify it is able to make the CUDA calls without erroring:
 
-```bash
+``bash
 python test.py
-```
+``
 
 Features
 --------
@@ -70,7 +70,7 @@ Known Issues
 * Add point and neighborhood files for C++ example
 * Documentation
 * Continuous integration
-* Create template returns an array that is incompatible with the ```prune_discrete``` function. This should return a numpy array
+* Create template returns an array that is incompatible with the ``prune_discrete`` function. This should return a numpy array
 
 Credits
 -------
