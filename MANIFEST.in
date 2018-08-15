@@ -1,0 +1,16 @@
+include AUTHORS.rst
+include CONTRIBUTING.rst
+include HISTORY.rst
+include LICENSE
+include README.rst
+include include/ngl_cuda.cuh
+include include/ngl_cuda.h
+include src/ngl_cuda.cu
+include src/test.cpp
+include nglpy_cuda/core.cpp
+
+recursive-include tests *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+
+recursive-include docs *.rst conf.py Makefile make.bat *.jpg *.png *.gif
