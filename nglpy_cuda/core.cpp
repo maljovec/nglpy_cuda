@@ -38,50 +38,6 @@ static PyObject* nglpy_cuda_core_get_edge_list(PyObject *self, PyObject *args) {
     return Py_BuildValue("O", edge_list);
 }
 
-void copy_pyobj_to_float(int row_count, int column_count, PyObject *py_array, float *c_array) {
-    PyObject *row_iter = PyObject_GetIter(py_array);
-    if (!row_iter) {
-        //error not iterator
-    }
-
-    int row, col;
-    for (row=0; row < row_count; row++) {
-        PyObject *row_obj = PyIter_Next(row_iter);
-	if (!row_obj) {
-	    //error data not correct shape
-	}
-	for (col=0; col < column_count; col++) {
-            PyObject *item_iter = PyObject_GetIter(row_obj);
-	    if (!item_iter || !PyFloat_Check(item_iter)) {
-	        //error data not correct shape
-            }
-	    c_array[row*column_count+col] = PyFloat_AsDouble(item_iter);
-	}
-    }
-}
-
-void copy_pyobj_to_int(int row_count, int column_count, PyObject *py_array, int *c_array) {
-    PyObject *row_iter = PyObject_GetIter(py_array);
-    if (!row_iter) {
-        //error not iterator
-    }
-
-    int row, col;
-    for (row=0; row < row_count; row++) {
-        PyObject *row_obj = PyIter_Next(row_iter);
-	if (!row_obj) {
-	    //error data not correct shape
-	}
-	for (col=0; col < column_count; col++) {
-            PyObject *item_iter = PyObject_GetIter(row_obj);
-	    if (!item_iter || !PyLong_Check(item_iter)) {
-	        //error data not correct shape
-            }
-	    c_array[row*column_count+col] = (int)PyLong_AsLong(item_iter);
-	}
-    }
-}
-
 static PyObject* nglpy_cuda_core_create_template(PyObject *self, PyObject *args) {
     float beta;
     int p;
@@ -120,23 +76,41 @@ static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args) 
     // OR
     float *erTemplate;
     
-    float *X;
-    int *edges;
+    PyArrayObject *X_arr;
+    PyArrayObject *edges_arr;
+    PyArrayObject *template_arr;
 
-    if(PyArg_ParseTuple(args, "iiiiffOO", &N, &D, &K, &steps, &beta, &p, &X, &edges)) {
+    npy_intp idx[2];
+    idx[0] = idx[1] = 0;
+
+    if(PyArg_ParseTuple(args, "iiiiffO&O&", &N, &D, &K, &steps, &beta, &p, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr)) {
+        float *X = (float *)PyArray_GetPtr(X_arr, idx);
+        int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
         nglcu::prune_discrete(N, D, K, steps, beta, p, X, edges);
-        return Py_BuildValue("O", edges);
+        Py_DECREF(X_arr);
+        return PyArray_Return(edges_arr);
     }
-    else if (PyArg_ParseTuple(args, "iiiiOOO", &N, &D, &K, &steps, &erTemplate, &X, &edges)) {
+    else if (PyArg_ParseTuple(args, "iiiiO&O&O&", &N, &D, &K, &steps, PyArray_Converter, &template_arr, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr)) {
+        // The fact that we passed through the first if clause means the error 
+	// indicator will be set with the following error message:
+	// TypeError: function takes exactly 8 arguments (7 given)
+	// By clearing this indicator, we are allowing the function to act in
+	// an overloaded fashion. TODO: I should probably verify that the
+	// error indicator is a PyExc_TypeErro.r
+	PyErr_Clear();
+       	float *X = (float *)PyArray_GetPtr(X_arr, idx);
+        int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
+        float *erTemplate = (float *)PyArray_GetPtr(template_arr, idx);
         nglcu::prune_discrete(N, D, K, steps, erTemplate, X, edges);
-        return Py_BuildValue("O", edges);
+        Py_DECREF(X_arr);
+        Py_DECREF(template_arr);
+        return PyArray_Return(edges_arr);
     }
     else {
         return NULL;
     }
 }
 
-//void prune(const int N, const int D, const int K, float lp, float beta, float *X, int *edges);
 static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args) {
     //import_array();
     int N;
@@ -149,25 +123,15 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "iiiffO&O&", &N, &D, &K, &lp, &beta, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr))
         return NULL;
 
-    //int edges[N*K];
     npy_intp idx[2];
     idx[0] = idx[1] = 0;
     float *X = (float *)PyArray_GetPtr(X_arr, idx);
     int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
-    //copy_pyobj_to_int(N, K, edges_obj, edges);
 
-    for (int i = 0; i < 5; i++){
-	for(int j = 0; j < K; j++) {
-	    std::cout << edges[i*K+j] << " ";
-	}
-	std::cout << std::endl;
-    }
-
+    nglcu::prune(N, D, K, lp, beta, X, edges);
     Py_DECREF(X_arr);
     //Py_DECREF(edges_arr);
 
-    nglcu::prune(N, D, K, lp, beta, X, edges);
-    //TODO: copy back
     return PyArray_Return(edges_arr);
 }
 
