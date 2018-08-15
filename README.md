@@ -46,12 +46,15 @@ python test.py
 
 # Known Issues
 * No support yet for relaxed Graphs
-* CUDA/C code only deals with single precision floating point, requiring the user to convert their numpy arrays, either allow for either-or or write python-side wrapper to abstract this away from the user.
+* CUDA/C code only deals with single precision floating point, requiring the user to convert their numpy arrays, either allow for both double and float types or write python-side wrapper to abstract this away from the user and force their data into single-precision.
 * Have nvcc run in python setup.py to remove extraneous step.
 * Add point and neighborhood files for C++ example
 * Documentation
-* Continuous integration
-* Create template returns an array that is incompatible with the ```prune_discrete``` function. This should return a numpy array
+* ```create_template``` returns an array that is incompatible with the ```prune_discrete``` function. This should return a numpy array
+* Formalize test framework
+* Setup code coverage for CUDA/C++ code
+* Setup continuous integration
+* Get all of the badges on this page working correctly: pyup, travis, readthedocs, pypi.
 
 # Credits
 
