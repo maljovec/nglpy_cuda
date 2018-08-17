@@ -56,7 +56,7 @@ def locate_cuda():
 
     cudaconfig = {'home': home, 'nvcc': nvcc,
                   'include': pjoin(home, 'include'),
-                  'lib64': pjoin(home, 'lib64')}
+                  'lib64': pjoin(home, 'lib')}
     for k, v in cudaconfig.items():
         if not os.path.exists(v):
             raise EnvironmentError(
@@ -120,28 +120,29 @@ setup_requirements = ['pytest-runner', ]
 test_requirements = ['pytest', ]
 
 
-nglpy_cuda_core = Extension('nglcu', sources=['nglpy_cuda/core.cpp'],
-                            include_dirs=['include'], libraries=['nglcu'],
-                            library_dirs=['.'])
+nglpy_cuda_core = Extension('nglpy_cuda.core', sources=['nglpy_cuda/core.cpp', 'src/ngl_cuda.cu'],
+                            include_dirs=['include', CUDA['include']],
+                            extra_compile_args={'gcc': [],
+                                                'nvcc': ['--compiler-options', "'-fPIC'"]})
 
-nglcu = Extension('nglcu',
-                  sources=['src/ngl_cuda.cu'],
-                  # library_dirs=[CUDA['lib64']],
-                  # libraries=['cudart'],
-                  # runtime_library_dirs=[CUDA['lib64']],
+#nglcu = Extension('nglcu',
+#                  sources=['src/ngl_cuda.cu'],
+#                  # library_dirs=[CUDA['lib64']],
+#                  # libraries=['cudart'],
+#                  # runtime_library_dirs=[CUDA['lib64']],
 
-                  # this syntax is specific to this build system
-                  # we're only going to use certain compiler args with
-                  # nvcc and not with gcc the implementation of this
-                  # trick is in customize_compiler() below
-                  extra_compile_args={'gcc': [],
-                                      'nvcc': ['--compiler-options', "'-fPIC'",
-                                               '--shared', '-o', 'libnglcu.so']},
-                  include_dirs=['include', CUDA['include'], 'src'])
+#                  # this syntax is specific to this build system
+#                  # we're only going to use certain compiler args with
+#                  # nvcc and not with gcc the implementation of this
+#                  # trick is in customize_compiler() below
+#                  extra_compile_args={'gcc': [],
+#                                      'nvcc': ['--compiler-options', "'-fPIC'",
+#                                               '--shared']},
+#                  include_dirs=['include', CUDA['include'], 'src'])
 
-nglpy_cuda_core = Extension('nglpy_cuda.core', sources=['nglpy_cuda/core.cpp'],
-                            include_dirs=['include'], libraries=['nglcu'],
-                            library_dirs=['.'])
+#nglpy_cuda_core = Extension('nglpy_cuda.core', sources=['nglpy_cuda/core.cpp'],
+#                            include_dirs=['include'], libraries=['nglcu'],
+#                            library_dirs=['.'])
 
 setup(
     author="Daniel Patrick Maljovec",
@@ -171,6 +172,8 @@ setup(
     url='https://github.com/maljovec/nglpy_cuda',
     version='0.1.0',
     zip_safe=False,
-    ext_modules=[nglcu, nglpy_cuda_core],
+#    ext_modules=[nglcu, nglpy_cuda_core],
+    ext_modules=[nglpy_cuda_core],
+    cmdclass={'build_ext': custom_build_ext},
     packages=['nglpy_cuda']
 )
