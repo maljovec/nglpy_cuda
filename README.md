@@ -26,7 +26,7 @@ nvcc src/ngl_cuda.cu -I include/ --compiler-options "-fPIC" --shared -o libnglcu
 
 The CUDA API can then be tested with a small C++ example (TODO: provide small data file in repo for testing this next line):
 ```bash
-g++ -L. -I ../include/ ../src/test.cpp -lnglcu -o test
+g++ -L. -I include/ src/test.cpp -lnglcu -o test
 ./test -i <input file> -d <# of dimensions> -c <# of points> -n <neighbor edge file> -k <k neighbors to prune> -b <beta parameter> -p <shape descriptor> -s <discretization steps>
 ```
 
@@ -45,6 +45,7 @@ python test.py
 * TODO
 
 # Known Issues
+* Python calls do not appear to be working correctly
 * No support yet for relaxed Graphs
 * CUDA/C code only deals with single precision floating point, requiring the user to convert their numpy arrays, either allow for both double and float types or write python-side wrapper to abstract this away from the user and force their data into single-precision.
 * Have nvcc run in python setup.py to remove extraneous step.
