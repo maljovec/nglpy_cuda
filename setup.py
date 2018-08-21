@@ -11,7 +11,7 @@ with open('README.md') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = []
+requirements = ['numpy>=1.15']
 
 ###############################################################################
 # Code from https://github.com/rmcgibbo/npcuda-example to build a custom
@@ -119,30 +119,14 @@ class custom_build_ext(build_ext):
 setup_requirements = ['pytest-runner', ]
 test_requirements = ['pytest', ]
 
-
-nglpy_cuda_core = Extension('nglpy_cuda.core', sources=['nglpy_cuda/core.cpp', 'src/ngl_cuda.cu'],
+nglpy_cuda_core = Extension('nglpy_cuda.core',
+                            sources=['nglpy_cuda/core.cpp', 'src/ngl_cuda.cu'],
                             include_dirs=['include', CUDA['include']],
+                            library_dirs=[CUDA['lib64']],
+                            runtime_library_dirs=[CUDA['lib64']],
+                            libraries=['cudart'],
                             extra_compile_args={'gcc': [],
-                                                'nvcc': ['--compiler-options', "'-fPIC'"]})
-
-#nglcu = Extension('nglcu',
-#                  sources=['src/ngl_cuda.cu'],
-#                  # library_dirs=[CUDA['lib64']],
-#                  # libraries=['cudart'],
-#                  # runtime_library_dirs=[CUDA['lib64']],
-
-#                  # this syntax is specific to this build system
-#                  # we're only going to use certain compiler args with
-#                  # nvcc and not with gcc the implementation of this
-#                  # trick is in customize_compiler() below
-#                  extra_compile_args={'gcc': [],
-#                                      'nvcc': ['--compiler-options', "'-fPIC'",
-#                                               '--shared']},
-#                  include_dirs=['include', CUDA['include'], 'src'])
-
-#nglpy_cuda_core = Extension('nglpy_cuda.core', sources=['nglpy_cuda/core.cpp'],
-#                            include_dirs=['include'], libraries=['nglcu'],
-#                            library_dirs=['.'])
+                                                'nvcc': ['-c', '--compiler-options', "'-fPIC'"]})
 
 setup(
     author="Daniel Patrick Maljovec",
@@ -172,7 +156,6 @@ setup(
     url='https://github.com/maljovec/nglpy_cuda',
     version='0.1.0',
     zip_safe=False,
-#    ext_modules=[nglcu, nglpy_cuda_core],
     ext_modules=[nglpy_cuda_core],
     cmdclass={'build_ext': custom_build_ext},
     packages=['nglpy_cuda']
