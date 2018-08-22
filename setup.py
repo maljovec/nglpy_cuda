@@ -116,8 +116,8 @@ class custom_build_ext(build_ext):
 ###############################################################################
 
 
-setup_requirements = ['pytest-runner', ]
-test_requirements = ['pytest', ]
+setup_requirements = []
+test_requirements = []
 
 nglpy_cuda_core = Extension('nglpy_cuda.core',
                             sources=['nglpy_cuda/core.cpp', 'src/ngl_cuda.cu'],
@@ -150,9 +150,9 @@ setup(
     include_package_data=True,
     keywords='nglpy_cuda',
     name='nglpy_cuda',
-    setup_requires=setup_requirements,
-    test_suite='tests',
-    tests_require=test_requirements,
+    # setup_requires=setup_requirements,
+    test_suite='nglpy_cuda.tests',
+    # tests_require=test_requirements,
     url='https://github.com/maljovec/nglpy_cuda',
     version='0.1.0',
     zip_safe=False,

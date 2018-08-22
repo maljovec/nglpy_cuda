@@ -16,7 +16,7 @@ inline void GPUAssert(cudaError_t code, const char *file, int line,
 
 namespace nglcu {
   dim3 block_size(32, 32);
-  dim3 grid_size(4, 4); 
+  dim3 grid_size(4, 4);
 
 __global__
 void prune_discrete_d(float *X, int *edgesIn, const int N, const int D,
@@ -249,12 +249,12 @@ void prune_discrete(const int N, const int D, const int K, const int steps,
     cudaErrchk(cudaMallocManaged(&x_d, N*D*sizeof(float)));
     cudaErrchk(cudaMallocManaged(&edgesIn_d, N*K*sizeof(int)));
     cudaErrchk(cudaMallocManaged(&edgesOut_d, N*K*sizeof(int)));
-    cudaErrchk(cudaMallocManaged(&erTemplate_d, (steps+1)*sizeof(float)));
+    cudaErrchk(cudaMallocManaged(&erTemplate_d, (steps)*sizeof(float)));
 
     memcpy(x_d, X, N*D*sizeof(float));
     memcpy(edgesIn_d, edges, N*K*sizeof(float));
     memcpy(edgesOut_d, edges, N*K*sizeof(float));
-    memcpy(erTemplate_d, erTemplate, (steps+1)*sizeof(float));
+    memcpy(erTemplate_d, erTemplate, (steps)*sizeof(float));
 
     prune_discrete_d<<<grid_size, block_size>>>(x_d, edgesIn_d, N, D, K, steps,
                                                 erTemplate_d, edgesOut_d);
