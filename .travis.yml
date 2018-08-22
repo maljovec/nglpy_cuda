@@ -14,8 +14,7 @@ before_install:
  - sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
  - sudo apt update
  - sudo apt-get install -y cuda
- - find / -name "nvcc"
- - export CUDAHOME=/usr
+ - export CUDAHOME=$(dirname $(dirname $(find / -xdev -name "nvcc" 2>/dev/null | head -n 1)))
 
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 # install: pip install -U tox-travis coveralls
