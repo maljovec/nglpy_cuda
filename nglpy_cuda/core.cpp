@@ -2,40 +2,43 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include "numpy/arrayobject.h"
 #include "ngl_cuda.h"
-#include <iostream>
 
 static PyObject* nglpy_cuda_core_get_edge_list(PyObject *self, PyObject *args) {
-    int *edges;
     int N;
     int K;
-    PyObject *edges_obj;
-    if (!PyArg_ParseTuple(args, "Oii", &edges_obj, &N, &K))
+    PyArrayObject *edges_arr;
+    if (!PyArg_ParseTuple(args, "iiO&", &N, &K, PyArray_Converter, &edges_arr))
         return NULL;
 
-    edges = new int[N*K];
-    PyObject *iter = PyObject_GetIter(edges_obj);
-    if (!iter) {
-        //error not iterator
-    }
+    npy_intp idx[2];
+    idx[0] = idx[1] = 0;
+    int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
 
-    int k=0, n=0;
-    while (n*K+k < N*K) {
-        PyObject *next = PyIter_Next(iter);
-	if (!next) {
-	    break;
-	}
-	if (!PyFloat_Check(next)) {
-	}
-
-	edges[n*K+k++] = PyFloat_AsDouble(next);
-	if(k == K) {
-	    k=0;
-	    n++;
-	}
+    //Do this in two cycles
+    //First cycle: grab the total number of edges needed
+    int i, k;
+    int edge_count = 0;
+    for(i = 0; i < N; i++) {
+        for(k = 0; k < K; k++) {
+            if (edges[i*K+k] != -1) {
+	        edge_count++;
+            }
+        }
     }
-    std::vector< std::pair<int, int> > edge_list = nglcu::get_edge_list(edges, N, K);
-    delete [] edges;
-    return Py_BuildValue("O", edge_list);
+    //Second cycle: fill in the array
+    PyObject* edge_list = PyList_New(edge_count);
+    edge_count = 0;
+    for(i = 0; i < N; i++) {
+        for(k = 0; k < K; k++) {
+            if (edges[i*K+k] != -1) {
+	        PyObject* item = Py_BuildValue("(ii)", i, edges[i*K+k]);
+                PyList_SetItem(edge_list, edge_count, item);
+	        edge_count++;
+            }
+        }
+    }
+    Py_DECREF(edges_arr);
+    return edge_list;
 }
 
 static PyObject* nglpy_cuda_core_create_template(PyObject *self, PyObject *args) {
@@ -74,11 +77,10 @@ static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args) 
     float beta;
     float p;
     // OR
-    float *erTemplate;
-    
+    PyArrayObject *template_arr;
+
     PyArrayObject *X_arr;
     PyArrayObject *edges_arr;
-    PyArrayObject *template_arr;
 
     npy_intp idx[2];
     idx[0] = idx[1] = 0;
@@ -91,13 +93,13 @@ static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args) 
         return PyArray_Return(edges_arr);
     }
     else if (PyArg_ParseTuple(args, "iiiiO&O&O&", &N, &D, &K, &steps, PyArray_Converter, &template_arr, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr)) {
-        // The fact that we passed through the first if clause means the error 
-	// indicator will be set with the following error message:
-	// TypeError: function takes exactly 8 arguments (7 given)
-	// By clearing this indicator, we are allowing the function to act in
-	// an overloaded fashion. TODO: I should probably verify that the
-	// error indicator is a PyExc_TypeErro.r
-	PyErr_Clear();
+        // The fact that we passed through the first if clause means the error
+        // indicator will be set with the following error message:
+        // TypeError: function takes exactly 8 arguments (7 given)
+        // By clearing this indicator, we are allowing the function to act in
+        // an overloaded fashion. TODO: I should probably verify that the
+        // error indicator is a PyExc_TypeError
+        PyErr_Clear();
        	float *X = (float *)PyArray_GetPtr(X_arr, idx);
         int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
         float *erTemplate = (float *)PyArray_GetPtr(template_arr, idx);
