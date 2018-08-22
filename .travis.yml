@@ -4,9 +4,9 @@ language: python
 dist: xenial
 python:
   - 3.7
-  - 3.6
-  - 3.5
-  - 2.7
+  # - 3.6
+  # - 3.5
+  # - 2.7
 
 before_install:
  - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_9.1.85-1_amd64.deb
@@ -14,7 +14,7 @@ before_install:
  - sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
  - sudo apt update
  - sudo apt-get install -y cuda
- - export CUDAHOME=/usr/bin
+ - export CUDAHOME=/usr
 
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 # install: pip install -U tox-travis coveralls
