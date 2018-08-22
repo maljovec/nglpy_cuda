@@ -13,9 +13,9 @@ nglpy_cuda
 .. image:: https://coveralls.io/repos/github/maljovec/nglpy_cuda/badge.svg?branch=master
         :target: https://coveralls.io/github/maljovec/nglpy_cuda?branch=master
         :alt: Coveralls
-.. image:: https://readthedocs.org/projects/nglpy_cuda/badge/?version=latest
-        :target: https://nglpy_cuda.readthedocs.io/en/latest/?badge=latest
-        :alt: ReadTheDocs
+.. image:: https://readthedocs.org/projects/nglpy-cuda/badge/?version=latest
+        :target: https://nglpy-cuda.readthedocs.io/en/latest/?badge=latest
+        :alt: Documentation Status
 .. image:: https://pyup.io/repos/github/maljovec/nglpy_cuda/shield.svg
         :target: https://pyup.io/repos/github/maljovec/nglpy_cuda/
         :alt: Pyup
