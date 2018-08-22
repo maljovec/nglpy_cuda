@@ -50,10 +50,10 @@ on empty region graph algorithms such as the beta skeleton family of graphs.
 
 Consider using an optimized approximate nearest neighbor library (see ann-benchmarks_
 for an updated list of algorithms and their relative performance) to construct the
-initial graph to be pruned, otherwise this library will rely on the exact K-nearest
+initial graph to be pruned, otherwise this library will rely on the exact k-nearest
 algorithm provided by scikit-learn_.
 
-.. _ann-bencharks: http://ann-benchmarks.com/
+.. _ann-benchmarks: http://ann-benchmarks.com/
 
 .. _scikit-learn: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html#sklearn.neighbors.NearestNeighbors
 
