@@ -54,7 +54,8 @@ def locate_cuda():
                                    'located in your $PATH. Either add it to your path, or set $CUDAHOME')
         home = os.path.dirname(os.path.dirname(nvcc))
 
-    cudaconfig = {'home': home, 'nvcc': nvcc,
+    cudaconfig = {'home': home,
+                  'nvcc': nvcc,
                   'include': pjoin(home, 'include'),
                   'lib64': pjoin(home, 'lib')}
     for k, v in cudaconfig.items():

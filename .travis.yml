@@ -15,6 +15,8 @@ before_install:
  - sudo apt update
  - sudo apt-get install -y cuda
  - export CUDAHOME=$(dirname $(dirname $(find / -xdev -name "nvcc" 2>/dev/null | head -n 1)))
+ - ls $CUDAHOME
+ - locate libcudart.so
 
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 # install: pip install -U tox-travis coveralls
