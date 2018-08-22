@@ -1,30 +1,14 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-"""The setup script."""
-
-from setuptools import setup
-
-with open('README.md') as readme_file:
-    readme = readme_file.read()
-
-with open('HISTORY.rst') as history_file:
-    history = history_file.read()
-
-requirements = ['numpy>=1.15']
-
-###############################################################################
-# Code from https://github.com/rmcgibbo/npcuda-example to build a custom
-# CUDA module via distutils
-import os
+import  os
 from os.path import join as pjoin
+from setuptools import setup
 from distutils.extension import Extension
 from distutils.command.build_ext import build_ext
-
+import subprocess
+import numpy
 
 def find_in_path(name, path):
     "Find a file in a search path"
-    # adapted fom http://code.activestate.com/recipes/52224-find-a-file-given-a-search-path/
+    #adapted fom http://code.activestate.com/recipes/52224-find-a-file-given-a-search-path/
     for dir in path.split(os.pathsep):
         binpath = pjoin(dir, name)
         if os.path.exists(binpath):
@@ -51,26 +35,46 @@ def locate_cuda():
         nvcc = find_in_path('nvcc', os.environ['PATH'])
         if nvcc is None:
             raise EnvironmentError('The nvcc binary could not be '
-                                   'located in your $PATH. Either add it to your path, or set $CUDAHOME')
+                'located in your $PATH. Either add it to your path, or set $CUDAHOME')
         home = os.path.dirname(os.path.dirname(nvcc))
 
-    cudaconfig = {'home': home,
-                  'nvcc': nvcc,
+    cudaconfig = {'home':home, 'nvcc':nvcc,
                   'include': pjoin(home, 'include'),
                   'lib64': pjoin(home, 'lib64')}
-
-    if not os.path.exists(cudaconfig['lib64']):
-        cudaconfig['lib64'] = pjoin(home, 'lib')
-
-    for k, v in cudaconfig.items():
+    for k, v in cudaconfig.iteritems():
         if not os.path.exists(v):
-            raise EnvironmentError(
-                'The CUDA %s path could not be located in %s' % (k, v))
+            raise EnvironmentError('The CUDA %s path could not be located in %s' % (k, v))
 
     return cudaconfig
-
-
 CUDA = locate_cuda()
+
+
+# Obtain the numpy include directory.  This logic works across numpy versions.
+try:
+    numpy_include = numpy.get_include()
+except AttributeError:
+    numpy_include = numpy.get_numpy_include()
+
+
+ext = Extension('_gpuadder',
+                sources=['src/swig_wrap.cpp', 'src/manager.cu'],
+                library_dirs=[CUDA['lib64']],
+                libraries=['cudart'],
+                runtime_library_dirs=[CUDA['lib64']],
+                # this syntax is specific to this build system
+                # we're only going to use certain compiler args with nvcc and not with gcc
+                # the implementation of this trick is in customize_compiler() below
+                extra_compile_args={'gcc': [],
+                                    'nvcc': ['-arch=sm_20', '--ptxas-options=-v', '-c', '--compiler-options', "'-fPIC'"]},
+                include_dirs = [numpy_include, CUDA['include'], 'src'])
+
+
+# check for swig
+if find_in_path('swig', os.environ['PATH']):
+    subprocess.check_call('swig -python -c++ -o src/swig_wrap.cpp src/gpuadder.i', shell=True)
+else:
+    raise EnvironmentError('the swig executable was not found in your PATH')
+
 
 
 def customize_compiler_for_nvcc(self):
@@ -110,62 +114,26 @@ def customize_compiler_for_nvcc(self):
     # inject our redefined _compile method into the class
     self._compile = _compile
 
+
 # run the customize_compiler
-
-
 class custom_build_ext(build_ext):
     def build_extensions(self):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
 
+setup(name='gpuadder',
+      # random metadata. there's more you can supploy
+      author='Robert McGibbon',
+      version='0.1',
 
-###############################################################################
-import numpy
+      # this is necessary so that the swigged python file gets picked up
+      py_modules=['gpuadder'],
+      package_dir={'': 'src'},
 
-setup_requirements = []
-test_requirements = []
+      ext_modules = [ext],
 
-nglpy_cuda_core = Extension('nglpy_cuda.core',
-                            sources=['nglpy_cuda/core.cpp', 'src/ngl_cuda.cu'],
-                            include_dirs=['include', CUDA['include'],
-                                          numpy.get_include()],
-                            library_dirs=[CUDA['lib64']],
-                            runtime_library_dirs=[CUDA['lib64']],
-                            libraries=['cudart'],
-                            extra_compile_args={'gcc': [],
-                                                'nvcc': ['-c',
-                                                         '--compiler-options',
-                                                         "'-fPIC'"]})
+      # inject our custom trigger
+      cmdclass={'build_ext': custom_build_ext},
 
-setup(
-    author="Daniel Patrick Maljovec",
-    author_email='maljovec002@gmail.com',
-    classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: BSD License',
-        'Natural Language :: English',
-        "Programming Language :: Python :: 2",
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-    ],
-    description="TODO",
-    install_requires=requirements,
-    license="BSD license",
-    long_description=readme + '\n\n' + history,
-    include_package_data=True,
-    keywords='nglpy_cuda',
-    name='nglpy_cuda',
-    # setup_requires=setup_requirements,
-    test_suite='nglpy_cuda.tests',
-    # tests_require=test_requirements,
-    url='https://github.com/maljovec/nglpy_cuda',
-    version='0.1.0',
-    zip_safe=False,
-    ext_modules=[nglpy_cuda_core],
-    cmdclass={'build_ext': custom_build_ext},
-    packages=['nglpy_cuda']
-)
+      # since the package has c code, the egg cannot be zipped
+      zip_safe=False)

@@ -1,29 +1,32 @@
 # Config file for automatic testing at travis-ci.org
 
 language: python
+dist: xenial
 python:
-  - 3.6
-  - 3.5
-  - 3.4
-  - 2.7
+  - 3.7
+  # - 3.6
+  # - 3.5
+  # - 2.7
+
+before_install:
+ - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_9.1.85-1_amd64.deb
+ - sudo dpkg -i cuda-repo-ubuntu1604_9.1.85-1_amd64.deb
+ - sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
+ - sudo apt update
+ - sudo apt-get install -y cuda
+ - export CUDAHOME=$(dirname $(dirname $(find / -xdev -name "nvcc" 2>/dev/null | head -n 1)))
 
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
-install: pip install -U tox-travis
+# install: pip install -U tox-travis coveralls
+install: pip install coveralls numpy
 
 # Command to run tests, e.g. python setup.py test
-script: tox
+script:
+ - python setup.py build
+#  - coverage run --source nglpy_cuda setup.py test
 
-# Assuming you have installed the travis-ci CLI tool, after you
-# create the Github repo and add it to Travis, run the
-# following command to finish PyPI deployment setup:
-# $ travis encrypt --add deploy.password
-deploy:
-  provider: pypi
-  distributions: sdist bdist_wheel
-  user: dmaljovec
-  password:
-    secure: PLEASE_REPLACE_ME
-  on:
-    tags: true
-    repo: maljovec/nglpy_cuda
-    python: 3.6
+after_success:
+  - coveralls
+branches:
+  only:
+  - master
