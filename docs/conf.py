@@ -46,7 +46,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'nglpy_cuda'
+project = 'nglpy-cuda'
 copyright = '2018, Dan Maljovec'
 author = 'Dan Maljovec'
 
@@ -115,7 +115,7 @@ html_static_path = ['_static']
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'nglpy_cudadoc'
+htmlhelp_basename = 'nglpy-cudadoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
