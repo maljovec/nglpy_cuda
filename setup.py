@@ -57,7 +57,11 @@ def locate_cuda():
     cudaconfig = {'home': home,
                   'nvcc': nvcc,
                   'include': pjoin(home, 'include'),
-                  'lib64': pjoin(home, 'lib')}
+                  'lib64': pjoin(home, 'lib64')}
+
+    if not os.path.exists(cudaconfig['lib64']):
+        cudaconfig['lib64'] = pjoin(home, 'lib')
+
     for k, v in cudaconfig.items():
         if not os.path.exists(v):
             raise EnvironmentError(
