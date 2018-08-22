@@ -1,5 +1,5 @@
 =====
-nglpy
+nglpy_cuda
 =====
 
 .. badges
@@ -24,24 +24,38 @@ nglpy
 
 .. logo
 
-.. image:: docs/_static/nglpy_cuda.svg
+.. image:: docs/_static/nglpycu.svg
     :align: center
-    :alt: nglpy
+    :alt: nglpycu
 
 .. end_logo
 
 .. introduction
 
-A Python wrapped version of the [Neighborhood Graph Library
-(NGL_) developed by Carlos Correa and Peter Lindstrom.
+A reimplementation of the Neighborhood Graph Library
+(NGL_) developed by Carlos Correa and Peter Lindstrom that
+supports pruning a graph on the GPU. Developed as a
+replacement for nglpy_ where a CUDA-compatible GPU is
+available.
 
 .. _NGL: http://www.ngraph.org/
+
+.. _nglpy: https://github.com/maljovec/nglpy
 
 .. LONG_DESCRIPTION
 
 Given a set of arbitrarily arranged points in any dimension, this library is
 able to construct several different types of neighborhood graphs mainly focusing
 on empty region graph algorithms such as the beta skeleton family of graphs.
+
+Consider using an optimized approximate nearest neighbor library (see ann-benchmarks_
+for an updated list of algorithms and their relative performance) to construct the
+initial graph to be pruned, otherwise this library will rely on the exact K-nearest
+algorithm provided by scikit-learn_.
+
+.. _ann-bencharks: http://ann-benchmarks.com/
+
+.. _scikit-learn: http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html#sklearn.neighbors.NearestNeighbors
 
 .. END_LONG_DESCRIPTION
 
@@ -52,7 +66,9 @@ on empty region graph algorithms such as the beta skeleton family of graphs.
 Prerequisites
 =============
 
-Nvidia CUDA Toolkit (TODO: determine minimum version number) - tested on 9.1::
+Nvidia CUDA Toolkit (TODO: determine minimum version number) - tested on 9.1.
+
+Otherwise, all other python requirements can be installed via pip::
 
     pip install -r requirements.txt
 
