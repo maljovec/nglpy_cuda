@@ -73,7 +73,7 @@ class CommandLine {
 	float getArgFloat(std::string arg) {
 		std::string val = args[arg];
 		return atof(val.c_str());
-	}													 
+	}
     int getArgInt(std::string arg) {
         std::string val = args[arg];
 		return atoi(val.c_str());
@@ -135,12 +135,12 @@ int main(int argc, char **argv)
   std::cerr << "Setup and Memory Allocation " << t2-t1 << " s" << std::endl;
   t1 = now();
 
-  std::ifstream file1( pointFile );
-  
+  std::ifstream file1( pointFile.c_str() );
+
   i = 0;
   d = 0;
   std::string line;
-  
+
   while ( std::getline(file1, line) )
   {
     std::istringstream iss(line);
@@ -153,10 +153,10 @@ int main(int argc, char **argv)
   t2 = now();
   std::cerr << "Reading Points " << t2-t1 << " s" << std::endl;
   t1 = now();
-  
+
   std::string edgeFile = cl.getArgString("-n");
 
-  std::ifstream file2 ( edgeFile );
+  std::ifstream file2 ( edgeFile.c_str() );
   i = 0;
   while ( std::getline(file2, line) )
   {
