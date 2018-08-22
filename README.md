@@ -1,6 +1,7 @@
 # nglpy-cuda
 [![PyPI](https://img.shields.io/pypi/v/nglpy_cuda.svg)](https://pypi.python.org/pypi/nglpy_cuda)
 [![TravisCI](https://img.shields.io/travis/maljovec/nglpy_cuda.svg)](https://travis-ci.org/maljovec/nglpy_cuda)
+[![Coverage Status](https://coveralls.io/repos/github/maljovec/nglpy_cuda/badge.svg?branch=master)](https://coveralls.io/github/maljovec/nglpy_cuda?branch=master)
 [![ReadTheDocs](https://readthedocs.org/projects/nglpy-cuda/badge/?version=latest)](https://nglpy-cuda.readthedocs.io/en/latest/?badge=latest)
 [![Pyup](https://pyup.io/repos/github/maljovec/nglpy_cuda/shield.svg)](https://pyup.io/repos/github/maljovec/nglpy_cuda/)
 
