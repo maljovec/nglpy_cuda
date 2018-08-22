@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# nglpy documentation build configuration file, created by
+# nglpy_cuda documentation build configuration file, created by
 # sphinx-quickstart on Fri Aug 17 13:15:45 2018.
 #
 # This file is execfile()d with the current directory set to its
