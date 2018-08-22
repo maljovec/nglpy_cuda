@@ -92,14 +92,8 @@ Otherwise, all other python requirements can be installed via pip::
 Build
 =====
 
-Until I get this packaged appropriately, use the following command to compile the CUDA code::
-
-    nvcc src/ngl_cuda.cu -I include/ --compiler-options "-fPIC" --shared -o libnglcu.so
-
-The CUDA API can then be tested with a small C++ example (TODO: provide small data file in repo for testing this next line)::
-
-    g++ -L. -I include/ src/test.cpp -lnglcu -o test
-    ./test -i <input file> -d <# of dimensions> -c <# of points> -n <neighbor edge file> -k <k neighbors to prune> -b <beta parameter> -p <shape descriptor> -s <discretization steps>
+Building the Python package
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For now, don't install this yet, but set it up in development mode::
 
@@ -108,6 +102,22 @@ For now, don't install this yet, but set it up in development mode::
 Run the test suite to verify it is able to make the CUDA calls without erroring::
 
     python setup.py test
+
+From here you should be ready to use the library. Only proceed below if you
+run into some install issues and want to try to at least build the shared
+library that you can use in C/C++ applications.
+
+Building and Testing the CUDA Library Separately
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Until I get this packaged appropriately, use the following command to compile the CUDA code::
+
+    nvcc src/ngl_cuda.cu -I include/ --compiler-options "-fPIC" --shared -o libnglcu.so
+
+The CUDA API can then be tested with a small C++ example (TODO: provide small data file in repo for testing this next line)::
+
+    g++ -L. -I include/ src/test.cpp -lnglcu -o test
+    ./test -i <input file> -d <# of dimensions> -c <# of points> -n <neighbor edge file> -k <k neighbors to prune> -b <beta parameter> -p <shape descriptor> -s <discretization steps>
 
 .. end_build
 
