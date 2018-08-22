@@ -1,5 +1,5 @@
 #include "ngl_cuda.cuh"
-#include <iostream>
+#include <cstdio>
 #include <vector>
 #include <map>
 #include <algorithm>
