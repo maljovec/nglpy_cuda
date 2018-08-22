@@ -118,20 +118,24 @@ class custom_build_ext(build_ext):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
 
-###############################################################################
 
+###############################################################################
+import numpy
 
 setup_requirements = []
 test_requirements = []
 
 nglpy_cuda_core = Extension('nglpy_cuda.core',
                             sources=['nglpy_cuda/core.cpp', 'src/ngl_cuda.cu'],
-                            include_dirs=['include', CUDA['include']],
+                            include_dirs=['include', CUDA['include'],
+                                          numpy.get_include()],
                             library_dirs=[CUDA['lib64']],
                             runtime_library_dirs=[CUDA['lib64']],
                             libraries=['cudart'],
                             extra_compile_args={'gcc': [],
-                                                'nvcc': ['-c', '--compiler-options', "'-fPIC'"]})
+                                                'nvcc': ['-c',
+                                                         '--compiler-options',
+                                                         "'-fPIC'"]})
 
 setup(
     author="Daniel Patrick Maljovec",
