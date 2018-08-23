@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# nglpy_cuda documentation build configuration file, created by
-# sphinx-quickstart on Fri Aug 17 13:15:45 2018.
+# nglpy-cuda documentation build configuration file, created by
+# sphinx-quickstart on Wed Aug 22 19:28:17 2018.
 #
 # This file is execfile()d with the current directory set to its
 # containing dir.
@@ -142,7 +142,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'nglpy_cuda.tex', 'nglpy_cuda Documentation',
+    (master_doc, 'nglpy-cuda.tex', 'nglpy-cuda Documentation',
      'Dan Maljovec', 'manual'),
 ]
 
@@ -152,7 +152,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'nglpy_cuda', 'nglpy_cuda Documentation',
+    (master_doc, 'nglpy-cuda', 'nglpy-cuda Documentation',
      [author], 1)
 ]
 
@@ -163,8 +163,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'nglpy_cuda', 'nglpy_cuda Documentation',
-     author, 'nglpy_cuda', 'One line description of project.',
+    (master_doc, 'nglpy-cuda', 'nglpy-cuda Documentation',
+     author, 'nglpy-cuda', 'One line description of project.',
      'Miscellaneous'),
 ]
 

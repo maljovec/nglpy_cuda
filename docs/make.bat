@@ -9,7 +9,7 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=.
 set BUILDDIR=_build
-set SPHINXPROJ=nglpy_cuda
+set SPHINXPROJ=nglpy-cuda
 
 if "%1" == "" goto help
 
