@@ -1,5 +1,5 @@
 ==========
-nglpy_cuda
+nglpy-cuda
 ==========
 
 .. badges
