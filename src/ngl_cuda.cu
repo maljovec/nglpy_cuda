@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <algorithm>
+#include <cmath>
 
 #define cudaErrchk(ans) { GPUAssert((ans), __FILE__, __LINE__); }
 inline void GPUAssert(cudaError_t code, const char *file, int line,
@@ -17,6 +18,14 @@ inline void GPUAssert(cudaError_t code, const char *file, int line,
 namespace nglcu {
     dim3 block_size(32, 32);
     dim3 grid_size(4, 4);
+
+    float logistic_function(float x, float r) {
+        // P(0) = 0.047... ~ 0.0
+        // P(r) = 0.5
+        // P(3*r) = 0.997... ~ 1.0
+        float k = 3. / r;
+        return 1 / (1 + exp(-k*(x - r)));
+    }
 
     __global__
     void prune_discrete_d(float *X, int *edgesIn, const int N, const int D,
@@ -193,6 +202,109 @@ namespace nglcu {
         }
     }
 
+    __global__
+    void probability_d(float *X,
+                       int *edgesIn,
+                       const int N,
+                       const int D,
+                       const int K,
+                       float lp,
+                       float beta,
+                       float *probabilities) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+        int stride_y = blockDim.y * gridDim.y;
+
+        float *p, *q, *r;
+
+        float pq[10] = {};
+        float pr[10] = {};
+
+        int i, j, k, k2, d, n;
+        float t;
+
+        float length_squared;
+        float squared_distance_to_edge;
+        float probability;
+        float minimum_allowable_distance;
+
+        ////////////////////////////////////////////////////////////
+        float xC, yC, radius, y;
+        ////////////////////////////////////////////////////////////
+
+        for (k = index_y; k < K; k += stride_y) {
+            for (i = index_x; i < N; i += stride_x) {
+                p = &(X[D*i]);
+                j = edgesIn[K*i+k];
+                q = &(X[D*j]);
+                // Initialize the probability to 1 and reduce it from
+                // there
+                probabilities[K*i+k] = 1;
+
+                length_squared = 0;
+                for(d = 0; d < D; d++) {
+                    pq[d] = p[d] - q[d];
+                    length_squared += pq[d]*pq[d];
+                }
+                // A point should not be connected to itself
+                if(length_squared == 0) {
+                    probabilities[K*i+k] = 0;
+                    continue;
+                }
+
+                // for(n = 0; n < N; n++) {
+                for(k2 = 0; k2 < 2*K; k2++) {
+                    n = (k2 < K) ? edgesIn[K*i+k2] : edgesIn[K*j+(k2-K)];
+                    r = &(X[D*n]);
+
+                    // t is the parameterization of the projection of pr
+                    // onto pq. In layman's terms, this is the length of
+                    // the shadow pr casts onto pq
+                    t = 0;
+                    for(d = 0; d < D; d++) {
+                        pr[d] = p[d] - r[d];
+                        t += pr[d]*pq[d];
+                    }
+
+                    t /= length_squared;
+
+                    if (t > 0 && t < 1) {
+                        squared_distance_to_edge = 0;
+                        for(d = 0; d < D; d++) {
+                            squared_distance_to_edge += (pr[d] - pq[d]*t)*(pr[d] - pq[d]*t);
+                        }
+
+                        ////////////////////////////////////////////////
+                        // ported from python function, can possibly be
+                        // improved in terms of performance
+                        xC = 0;
+                        yC = 0;
+
+                        if (beta <= 1) {
+                            radius = 1. / beta;
+                            yC = powf(powf(radius, lp) - 1, 1. / lp);
+                        }
+                        else {
+                            radius = beta;
+                            xC = 1. - beta;
+                        }
+                        t = fabs(2*t-1);
+                        y = powf(powf(radius, lp) - powf(t-xC, lp), 1. / lp) - yC;
+                        minimum_allowable_distance = 0.5*y*sqrt(length_squared);
+
+                        probability = logistic_function(sqrt(squared_distance_to_edge), minimum_allowable_distance);
+
+                        if(probability < probabilities[K*i+k]) {
+                            probabilities[K*i+k] = probability;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     float min_distance_from_edge(float t, float beta, float p) {
         float xC = 0;
         float yC = 0;
@@ -296,6 +408,46 @@ namespace nglcu {
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
+    }
+
+    void associate_probability(const int N,
+                               const int D,
+                               const int K,
+                               float lp,
+                               float beta,
+                               float *X,
+                               int *edges,
+                               float *probabilities) {
+        float *x_d;
+        int *edgesIn_d;
+        float *probabilities_d;
+        cudaMallocManaged(&x_d, N*D*sizeof(float));
+        cudaMallocManaged(&edgesIn_d, N*K*sizeof(int));
+        cudaMallocManaged(&probabilities_d, N*K*sizeof(float));
+
+        memcpy(x_d, X, N*D*sizeof(float));
+        memcpy(edgesIn_d, edges, N*K*sizeof(float));
+        // We don't care what probabilities_d holds initially, we will
+        // overwrite it.
+
+        probability_d<<<grid_size, block_size>>>(x_d,
+                                                    edgesIn_d,
+                                                    N,
+                                                    D,
+                                                    K,
+                                                    lp,
+                                                    beta,
+                                                    probabilities_d);
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+            printf("Error: %s\n", cudaGetErrorString(err));
+        cudaDeviceSynchronize();
+
+        memcpy(probabilities, probabilities_d, N*K*sizeof(float));
+
+        cudaFree(x_d);
+        cudaFree(edgesIn_d);
+        cudaFree(probabilities_d);
     }
 
     vector_edge get_edge_list(int *edges, const int N, const int K) {
