@@ -137,12 +137,45 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args) {
     return PyArray_Return(edges_arr);
 }
 
+static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args) {
+    //import_array();
+    int N;
+    int D;
+    int K;
+    float lp;
+    float beta;
+    PyArrayObject *X_arr;
+    PyArrayObject *edges_arr;
+    PyArrayObject *probability_arr;
+    if (!PyArg_ParseTuple(args, "iiiffO&O&", &N, &D, &K, &lp, &beta, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr))
+        return NULL;
+
+    npy_intp idx[2];
+
+    idx[0] = N;
+    idx[1] = K;
+    probability_arr = (PyArrayObject *)PyArray_ZEROS(2, idx, NPY_CFLOAT, 0);
+
+    //Reuse this array since we already have it allocated
+    idx[0] = idx[1] = 0;
+    float *X = (float *)PyArray_GetPtr(X_arr, idx);
+    int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
+    float *probabilities = (float *)PyArray_GetPtr(probability_arr, idx);
+
+    nglcu::associate_probability(N, D, K, lp, beta, X, edges, probabilities);
+    Py_DECREF(X_arr);
+    //Py_DECREF(edges_arr);
+
+    return PyArray_Return(probability_arr);
+}
+
 static PyMethodDef nglpy_cuda_core_methods[] = {
     {"get_edge_list", (PyCFunction)nglpy_cuda_core_get_edge_list, METH_VARARGS, ""},
     {"create_template",(PyCFunction)nglpy_cuda_core_create_template, METH_VARARGS, ""},
     {"min_distance_from_edge",(PyCFunction)nglpy_cuda_core_min_distance_from_edge, METH_VARARGS, ""},
     {"prune_discrete",(PyCFunction)nglpy_cuda_core_prune_discrete, METH_VARARGS, ""},
     {"prune",(PyCFunction)nglpy_cuda_core_prune, METH_VARARGS, ""},
+    {"associate_probability",(PyCFunction)nglpy_cuda_core_probability, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}
 };
 

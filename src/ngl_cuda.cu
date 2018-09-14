@@ -3,7 +3,6 @@
 #include <vector>
 #include <map>
 #include <algorithm>
-#include <cmath>
 
 #define cudaErrchk(ans) { GPUAssert((ans), __FILE__, __LINE__); }
 inline void GPUAssert(cudaError_t code, const char *file, int line,
@@ -19,12 +18,13 @@ namespace nglcu {
     dim3 block_size(32, 32);
     dim3 grid_size(4, 4);
 
+    __device__
     float logistic_function(float x, float r) {
         // P(0) = 0.047... ~ 0.0
         // P(r) = 0.5
         // P(3*r) = 0.997... ~ 1.0
         float k = 3. / r;
-        return 1 / (1 + exp(-k*(x - r)));
+        return 1 / (1 + expf(-k*(x - r)));
     }
 
     __global__
@@ -364,8 +364,8 @@ namespace nglcu {
         cudaErrchk(cudaMallocManaged(&erTemplate_d, (steps)*sizeof(float)));
 
         memcpy(x_d, X, N*D*sizeof(float));
-        memcpy(edgesIn_d, edges, N*K*sizeof(float));
-        memcpy(edgesOut_d, edges, N*K*sizeof(float));
+        memcpy(edgesIn_d, edges, N*K*sizeof(int));
+        memcpy(edgesOut_d, edges, N*K*sizeof(int));
         memcpy(erTemplate_d, erTemplate, (steps)*sizeof(float));
 
         prune_discrete_d<<<grid_size, block_size>>>(x_d, edgesIn_d, N, D, K, steps,
@@ -375,7 +375,7 @@ namespace nglcu {
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
 
-        memcpy(edges, edgesOut_d, N*K*sizeof(float));
+        memcpy(edges, edgesOut_d, N*K*sizeof(int));
 
         cudaFree(x_d);
         cudaFree(edgesIn_d);
@@ -393,8 +393,8 @@ namespace nglcu {
         cudaMallocManaged(&edgesOut_d, N*K*sizeof(int));
 
         memcpy(x_d, X, N*D*sizeof(float));
-        memcpy(edgesIn_d, edges, N*K*sizeof(float));
-        memcpy(edgesOut_d, edges, N*K*sizeof(float));
+        memcpy(edgesIn_d, edges, N*K*sizeof(int));
+        memcpy(edgesOut_d, edges, N*K*sizeof(int));
 
         prune_d<<<grid_size, block_size>>>(x_d, edgesIn_d, N, D, K, lp, beta,
                                         edgesOut_d);
@@ -403,7 +403,7 @@ namespace nglcu {
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
 
-        memcpy(edges, edgesOut_d, N*K*sizeof(float));
+        memcpy(edges, edgesOut_d, N*K*sizeof(int));
 
         cudaFree(x_d);
         cudaFree(edgesIn_d);
@@ -426,7 +426,7 @@ namespace nglcu {
         cudaMallocManaged(&probabilities_d, N*K*sizeof(float));
 
         memcpy(x_d, X, N*D*sizeof(float));
-        memcpy(edgesIn_d, edges, N*K*sizeof(float));
+        memcpy(edgesIn_d, edges, N*K*sizeof(int));
         // We don't care what probabilities_d holds initially, we will
         // overwrite it.
 

@@ -119,6 +119,7 @@ int main(int argc, char **argv)
   // Load data set and edges from files
   float *x;
   int *edgesOut;
+  float *probabilities;
   float *referenceShape;
 
   int i, d, k;
@@ -127,6 +128,7 @@ int main(int argc, char **argv)
 
   x = new float[N*D];
   edgesOut = new int[N*K];
+  probabilities = new float[N*K];
   if(discrete) {
     referenceShape = new float[steps+1];
   }
@@ -180,16 +182,32 @@ int main(int argc, char **argv)
       nglcu::prune(N, D, K, lp, beta, x, edgesOut);
   }
 
+  nglcu::associate_probability(N, D, K, lp, beta, x, edgesOut, probabilities);
+
   t2 = now();
   std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;
   t1 = now();
 
   for(i = 0; i < N; i++) {
     for(k = 0; k < K; k++) {
-      if (edgesOut[i*K+k] != -1) {
-        std::cout << i << " " << edgesOut[i*K+k] << std::endl;
-      }
+        if (k > 0) {
+            std::cout << " ";
+        }
+        std::cout << edgesOut[i*K+k];
     }
+    std::cout << std::endl;
+  }
+
+  std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+  std::cout << "     Probabilities" << std::endl;
+  for(i = 0; i < N; i++) {
+    for(k = 0; k < K; k++) {
+        if (k > 0) {
+            std::cout << " ";
+        }
+        std::cout << probabilities[i*K+k];
+    }
+    std::cout << std::endl;
   }
 
   t2 = now();
@@ -199,6 +217,7 @@ int main(int argc, char **argv)
   // Free memory
   delete [] x;
   delete [] edgesOut;
+  delete [] probabilities;
   if(discrete) {
       delete [] referenceShape;
   }
