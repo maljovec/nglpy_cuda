@@ -97,6 +97,7 @@ int main(int argc, char **argv)
   cl.addArgument("-k", "-1", "K max", false);
   cl.addArgument("-b", "1.0", "Beta", false);
   cl.addArgument("-p", "2.0", "Lp-norm", false);
+  cl.addArgument("-r", "0", "Relaxed", false);
   cl.addArgument("-s", "-1", "# of Discretization Steps. Use -1 to disallow discretization.", false);
   bool hasArguments = cl.processArgs(argc, argv);
   if(!hasArguments) {
@@ -112,6 +113,7 @@ int main(int argc, char **argv)
   int K = cl.getArgInt("-k");
   int steps = cl.getArgInt("-s");
   bool discrete = steps > 0;
+  bool relaxed = cl.getArgInt("-r") > 0;
 
   float beta = cl.getArgFloat("-b");
   float lp = cl.getArgFloat("-p");
@@ -177,7 +179,13 @@ int main(int argc, char **argv)
       nglcu::prune_discrete(N, D, K, steps, referenceShape, x, edgesOut);
   }
   else {
-      nglcu::prune(N, D, K, lp, beta, x, edgesOut);
+      if (relaxed) {
+        nglcu::prune_relaxed(N, D, K, lp, beta, x, edgesOut);
+      }
+      else {
+        nglcu::prune(N, D, K, lp, beta, x, edgesOut);
+      }
+
   }
 
   t2 = now();

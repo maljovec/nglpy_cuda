@@ -15,6 +15,8 @@ namespace nglcu{
                         float beta, float p, float *X, int *edges);
     void prune(const int N, const int D, const int K, float lp, float beta,
                float *X, int *edges);
+    void prune_relaxed(const int N, const int D, const int K, float lp,
+                       float beta, float *X, int *edges);
 
     void print_cuda_info();
 }

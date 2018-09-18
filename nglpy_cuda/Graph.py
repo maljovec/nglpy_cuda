@@ -111,7 +111,7 @@ class Graph(object):
         k = len(edge_matrix[0])
 
         self.edge_matrix = nglpy_cuda.prune(
-            N, D, k, p, beta, self.X, edge_matrix)
+            N, D, k, p, beta, 'relaxed' in graph, self.X, edge_matrix)
 
     def neighbors(self, idx=None):
         """ Returns the list of neighbors associated to a particular

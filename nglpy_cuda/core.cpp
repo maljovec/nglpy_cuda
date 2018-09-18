@@ -120,9 +120,10 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args) {
     int K;
     float lp;
     float beta;
+    bool relaxed;
     PyArrayObject *X_arr;
     PyArrayObject *edges_arr;
-    if (!PyArg_ParseTuple(args, "iiiffO&O&", &N, &D, &K, &lp, &beta, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr))
+    if (!PyArg_ParseTuple(args, "iiiffpO&O&", &N, &D, &K, &lp, &beta, &relaxed, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr))
         return NULL;
 
     npy_intp idx[2];
@@ -130,7 +131,13 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args) {
     float *X = (float *)PyArray_GetPtr(X_arr, idx);
     int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
 
-    nglcu::prune(N, D, K, lp, beta, X, edges);
+    if (relaxed) {
+        nglcu::prune_relaxed(N, D, K, lp, beta, X, edges);
+    }
+    else {
+        nglcu::prune(N, D, K, lp, beta, X, edges);
+    }
+
     Py_DECREF(X_arr);
     //Py_DECREF(edges_arr);
 

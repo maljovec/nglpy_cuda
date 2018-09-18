@@ -17,6 +17,8 @@ inline void GPUAssert(cudaError_t code, const char *file, int line,
 namespace nglcu {
     dim3 block_size(32, 32);
     dim3 grid_size(4, 4);
+    dim3 block_size_1D(1024);
+    dim3 grid_size_1D(16);
 
     __global__
     void prune_discrete_d(float *X, int *edgesIn, const int N, const int D,
@@ -193,6 +195,104 @@ namespace nglcu {
         }
     }
 
+    __global__
+    void prune_relaxed_d(float *X, int *edgesIn, const int N, const int D,
+                         const int K, float lp, float beta, int *edgesOut) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        // We should use a 1D structure for this since we need to guarantee
+        // that other points have already been processed
+        // int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+        // int stride_y = blockDim.y * gridDim.y;
+
+        float *p, *q, *r;
+
+        float pq[10] = {};
+        float pr[10] = {};
+
+        int i, j, k, k2, d, n;
+        float t;
+
+        float length_squared;
+        float squared_distance_to_edge;
+        float minimum_allowable_distance;
+
+        ////////////////////////////////////////////////////////////
+        float xC, yC, radius, y;
+        ////////////////////////////////////////////////////////////
+
+        for (i = index_x; i < N; i += stride_x) {
+            for (k = 0; k < K; k++) {
+                p = &(X[D*i]);
+                j = edgesIn[K*i+k];
+                q = &(X[D*j]);
+
+                length_squared = 0;
+                for(d = 0; d < D; d++) {
+                    pq[d] = p[d] - q[d];
+                    length_squared += pq[d]*pq[d];
+                }
+                // A point should not be connected to itself
+                if(length_squared == 0) {
+                    edgesOut[K*i+k] = -1;
+                    continue;
+                }
+
+                // This loop presumes that all nearer neighbors have
+                // already been processed
+                for(k2 = 0; k2 < k; k2++) {
+                    n = edgesOut[K*i+k2];
+                    if (n == -1){
+                        continue;
+                    }
+                    r = &(X[D*n]);
+
+                    // t is the parameterization of the projection of pr onto pq
+                    // In layman's terms, this is the length of the shadow pr casts onto pq
+                    t = 0;
+                    for(d = 0; d < D; d++) {
+                        pr[d] = p[d] - r[d];
+                        t += pr[d]*pq[d];
+                    }
+
+                    t /= length_squared;
+
+                    if (t > 0 && t < 1) {
+                        squared_distance_to_edge = 0;
+                        for(d = 0; d < D; d++) {
+                            squared_distance_to_edge += (pr[d] - pq[d]*t)*(pr[d] - pq[d]*t);
+                        }
+
+                        ////////////////////////////////////////////////////////////
+                        // ported from python function, can possibly be improved
+                        // in terms of performance
+                        xC = 0;
+                        yC = 0;
+
+                        if (beta <= 1) {
+                            radius = 1. / beta;
+                            yC = powf(powf(radius, lp) - 1, 1. / lp);
+                        }
+                        else {
+                            radius = beta;
+                            xC = 1. - beta;
+                        }
+                        t = fabs(2*t-1);
+                        y = powf(powf(radius, lp) - powf(t-xC, lp), 1. / lp) - yC;
+                        minimum_allowable_distance = 0.5*y*sqrt(length_squared);
+
+                        //////////////////////////////////////////////////////////
+                        if(sqrt(squared_distance_to_edge) < minimum_allowable_distance) {
+                            edgesOut[K*i+k] = -1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     float min_distance_from_edge(float t, float beta, float p) {
         float xC = 0;
         float yC = 0;
@@ -286,6 +386,32 @@ namespace nglcu {
 
         prune_d<<<grid_size, block_size>>>(x_d, edgesIn_d, N, D, K, lp, beta,
                                         edgesOut_d);
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+            printf("Error: %s\n", cudaGetErrorString(err));
+        cudaDeviceSynchronize();
+
+        memcpy(edges, edgesOut_d, N*K*sizeof(float));
+
+        cudaFree(x_d);
+        cudaFree(edgesIn_d);
+        cudaFree(edgesOut_d);
+    }
+
+    void prune_relaxed(const int N, const int D, const int K, float lp,
+                       float beta, float *X, int *edges) {
+        float *x_d;
+        int *edgesIn_d;
+        int *edgesOut_d;
+        cudaMallocManaged(&x_d, N*D*sizeof(float));
+        cudaMallocManaged(&edgesIn_d, N*K*sizeof(int));
+        cudaMallocManaged(&edgesOut_d, N*K*sizeof(int));
+
+        memcpy(x_d, X, N*D*sizeof(float));
+        memcpy(edgesIn_d, edges, N*K*sizeof(float));
+        memcpy(edgesOut_d, edges, N*K*sizeof(float));
+
+        prune_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, N, D, K, lp, beta, edgesOut_d);
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));
