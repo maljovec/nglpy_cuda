@@ -363,5 +363,6 @@ probabilities = get_probability(X, edges, beta=args.beta, lp=args.p)
 end = time.time()
 print('Actual prune function ({} s)'.format(end-start), file=sys.stderr)
 
-print(pruned_edges)
-print(probabilities)
+with np.printoptions(precision=3, suppress=True):
+    print(np.array(pruned_edges, dtype=int))
+    print(probabilities)

@@ -144,10 +144,11 @@ static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args) {
     int K;
     float lp;
     float beta;
+    float steepness;
     PyArrayObject *X_arr;
     PyArrayObject *edges_arr;
     PyArrayObject *probability_arr;
-    if (!PyArg_ParseTuple(args, "iiiffO&O&", &N, &D, &K, &lp, &beta, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr))
+    if (!PyArg_ParseTuple(args, "iiifffO&O&", &N, &D, &K, &lp, &beta, &steepness, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr))
         return NULL;
 
     npy_intp idx[2];
@@ -162,7 +163,7 @@ static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args) {
     int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
     float *probabilities = (float *)PyArray_GetPtr(probability_arr, idx);
 
-    nglcu::associate_probability(N, D, K, lp, beta, X, edges, probabilities);
+    nglcu::associate_probability(N, D, K, lp, beta, steepness, X, edges, probabilities);
     Py_DECREF(X_arr);
     //Py_DECREF(edges_arr);
 

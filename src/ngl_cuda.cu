@@ -19,12 +19,12 @@ namespace nglcu {
     dim3 grid_size(4, 4);
 
     __device__
-    float logistic_function(float x, float r) {
+    float logistic_function(float x, float r, float steepness=3.) {
         // P(0) = 0.047... ~ 0.0
         // P(r) = 0.5
         // P(3*r) = 0.997... ~ 1.0
-        float k = 3. / r;
-        return 1 / (1 + expf(-k*(x - r)));
+        float k = steepness / r;
+        return 1. / (1. + expf(-k*(x - r)));
     }
 
     __global__
@@ -210,6 +210,7 @@ namespace nglcu {
                        const int K,
                        float lp,
                        float beta,
+                       float steepness,
                        float *probabilities) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
@@ -294,7 +295,7 @@ namespace nglcu {
                         y = powf(powf(radius, lp) - powf(t-xC, lp), 1. / lp) - yC;
                         minimum_allowable_distance = 0.5*y*sqrt(length_squared);
 
-                        probability = logistic_function(sqrt(squared_distance_to_edge), minimum_allowable_distance);
+                        probability = logistic_function(sqrt(squared_distance_to_edge), minimum_allowable_distance, steepness);
 
                         if(probability < probabilities[K*i+k]) {
                             probabilities[K*i+k] = probability;
@@ -415,6 +416,7 @@ namespace nglcu {
                                const int K,
                                float lp,
                                float beta,
+                               float steepness,
                                float *X,
                                int *edges,
                                float *probabilities) {
@@ -431,13 +433,14 @@ namespace nglcu {
         // overwrite it.
 
         probability_d<<<grid_size, block_size>>>(x_d,
-                                                    edgesIn_d,
-                                                    N,
-                                                    D,
-                                                    K,
-                                                    lp,
-                                                    beta,
-                                                    probabilities_d);
+                                                 edgesIn_d,
+                                                 N,
+                                                 D,
+                                                 K,
+                                                 lp,
+                                                 beta,
+                                                 steepness,
+                                                 probabilities_d);
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));

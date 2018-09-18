@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <sys/time.h>
 #include <unistd.h>
+#include <iomanip>
+
   typedef struct timeval timestamp;
   static inline float operator - (const timestamp &t1, const timestamp &t2)
   {
@@ -97,6 +99,7 @@ int main(int argc, char **argv)
   cl.addArgument("-k", "-1", "K max", false);
   cl.addArgument("-b", "1.0", "Beta", false);
   cl.addArgument("-p", "2.0", "Lp-norm", false);
+  cl.addArgument("-a", "3.0", "Steepness", false);
   cl.addArgument("-s", "-1", "# of Discretization Steps. Use -1 to disallow discretization.", false);
   bool hasArguments = cl.processArgs(argc, argv);
   if(!hasArguments) {
@@ -115,6 +118,7 @@ int main(int argc, char **argv)
 
   float beta = cl.getArgFloat("-b");
   float lp = cl.getArgFloat("-p");
+  float steepness = cl.getArgFloat("-a");
 
   // Load data set and edges from files
   float *x;
@@ -174,15 +178,15 @@ int main(int argc, char **argv)
   std::cerr << "Reading Graph " << t2-t1 << " s" << std::endl;
   t1 = now();
 
-  if(discrete) {
-      nglcu::create_template(referenceShape, 1, 2, steps);
-      nglcu::prune_discrete(N, D, K, steps, referenceShape, x, edgesOut);
-  }
-  else {
-      nglcu::prune(N, D, K, lp, beta, x, edgesOut);
-  }
+//   if(discrete) {
+//       nglcu::create_template(referenceShape, 1, 2, steps);
+//       nglcu::prune_discrete(N, D, K, steps, referenceShape, x, edgesOut);
+//   }
+//   else {
+//       nglcu::prune(N, D, K, lp, beta, x, edgesOut);
+//   }
 
-  nglcu::associate_probability(N, D, K, lp, beta, x, edgesOut, probabilities);
+  nglcu::associate_probability(N, D, K, lp, beta, steepness, x, edgesOut, probabilities);
 
   t2 = now();
   std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;
@@ -193,19 +197,26 @@ int main(int argc, char **argv)
         if (k > 0) {
             std::cout << " ";
         }
-        std::cout << edgesOut[i*K+k];
+        std::cout << std::setw(2) << edgesOut[i*K+k];
     }
     std::cout << std::endl;
   }
 
   std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
   std::cout << "     Probabilities" << std::endl;
+  std::cout << std::setw(6) << std::setprecision(3);
   for(i = 0; i < N; i++) {
     for(k = 0; k < K; k++) {
         if (k > 0) {
             std::cout << " ";
         }
-        std::cout << probabilities[i*K+k];
+        if (probabilities[i*K+k] == 0 || probabilities[i*K+k] == 1) {
+            std::cout << std::setw(5) << std::left << std::fixed << std::setprecision(0) << probabilities[i*K+k];
+        }
+        else{
+            std::cout << std::setw(5) << std::left << std::fixed << std::setprecision(3) << probabilities[i*K+k];
+        }
+
     }
     std::cout << std::endl;
   }
