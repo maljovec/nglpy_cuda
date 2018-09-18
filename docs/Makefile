@@ -4,7 +4,7 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
-SPHINXPROJ    = nglpy_cuda
+SPHINXPROJ    = nglpy-cuda
 SOURCEDIR     = .
 BUILDDIR      = _build
 

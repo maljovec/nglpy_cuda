@@ -135,7 +135,7 @@ int main(int argc, char **argv)
   fprintf(stderr, "Setup and Memory Allocation (%f s)\n", t2-t1);
   t1 = now();
 
-  std::ifstream file1( pointFile );
+  std::ifstream file1( pointFile.c_str() );
 
   i = 0;
   d = 0;
@@ -156,7 +156,7 @@ int main(int argc, char **argv)
 
   std::string edgeFile = cl.getArgString("-n");
 
-  std::ifstream file2 ( edgeFile );
+  std::ifstream file2 ( edgeFile.c_str() );
   i = 0;
   while ( std::getline(file2, line) )
   {
