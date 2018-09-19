@@ -56,7 +56,6 @@ class TestGraph(unittest.TestCase):
 
         self.assertSetEqual(self.gold_strict, test)
 
-
     def test_relaxed(self):
         """
         Test Graph's ability to build knn and prune correctly in the
@@ -80,6 +79,7 @@ class TestGraph(unittest.TestCase):
             test.add((min(e1, e2), max(e1, e2)))
 
         self.assertSetEqual(self.gold_relaxed, test)
+
 
 if __name__ == '__main__':
     unittest.main()
