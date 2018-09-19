@@ -5,14 +5,6 @@
 
 from setuptools import setup
 
-with open('README.rst') as readme_file:
-    readme = readme_file.read()
-
-with open('HISTORY.rst') as history_file:
-    history = history_file.read()
-
-requirements = ['numpy']
-
 ###############################################################################
 # Code from https://github.com/rmcgibbo/npcuda-example to build a custom
 # CUDA module via distutils
@@ -20,6 +12,14 @@ import os
 from os.path import join as pjoin
 from distutils.extension import Extension
 from distutils.command.build_ext import build_ext
+
+with open('README.rst') as readme_file:
+    readme = readme_file.read()
+
+with open('HISTORY.rst') as history_file:
+    history = history_file.read()
+
+requirements = ['numpy']
 
 
 def find_in_path(name, path):
@@ -51,7 +51,8 @@ def locate_cuda():
         nvcc = find_in_path('nvcc', os.environ['PATH'])
         if nvcc is None:
             raise EnvironmentError('The nvcc binary could not be '
-                                   'located in your $PATH. Either add it to your path, or set $CUDAHOME')
+                                   'located in your $PATH. Either add '
+                                   'it to your path, or set $CUDAHOME')
         home = os.path.dirname(os.path.dirname(nvcc))
 
     cudaconfig = {'home': home,
