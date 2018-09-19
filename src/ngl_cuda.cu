@@ -22,7 +22,7 @@ namespace nglcu {
 
     __global__
     void prune_discrete_d(float *X, int *edgesIn, const int N, const int D,
-                        const int K, const int steps, float *erTemplate,
+                        const int K, float *erTemplate, const int steps,
                         int *edgesOut) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
@@ -76,6 +76,90 @@ namespace nglcu {
                 // for(n = 0; n < N; n++) {
                 for(k2 = 0; k2 < 2*K; k2++) {
                     n = (k2 < K) ? edgesIn[K*i+k2] : edgesIn[K*j+(k2-K)];
+                    r = &(X[D*n]);
+
+                    t = 0;
+                    for(d = 0; d < D; d++) {
+                        pr[d] = p[d] - r[d];
+                        t += pr[d]*pq[d];
+                    }
+
+                    t /= length_squared;
+                    lookup = __float2int_rd(abs(steps * (2 * t - 1))+0.5);
+                    if (lookup >= 0 && lookup <= steps) {
+                        squared_distance_to_edge = 0;
+                        for(d = 0; d < D; d++) {
+                            squared_distance_to_edge += (pr[d] - pq[d]*t)*(pr[d] - pq[d]*t);
+                        }
+                        minimum_allowable_distance = sqrt(length_squared)*erTemplate[lookup];
+
+                        if(sqrt(squared_distance_to_edge) < minimum_allowable_distance) {
+                            edgesOut[K*i+k] = -1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    __global__
+    void prune_discrete_relaxed_d(float *X, int *edgesIn, const int N,
+                                  const int D, const int K, float *erTemplate,
+                                  const int steps, int *edgesOut) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        // References to points in X
+        float *p, *q, *r;
+
+        //TODO: Fix this to be dynamically allocated
+        // Computed vectors representing the edge under test pq and the vector from
+        // one end point to a third point r (We will iterate over all possible r's)
+        float pq[10] = {};
+        float pr[10] = {};
+
+        // Different iterator/indexing variables i, j, and n are rows in X
+        // representing p, q, and r, respectively
+        // k is the nearest neighbor, d is the dimension
+        int i, j, k, k2, d, n;
+
+        // t is the parameterization of the projection of pr onto pq
+        // In layman's terms, this is the length of the shadow pr casts onto pq
+        // lookup is the
+        float t;
+        int lookup;
+
+        // Some other temporary variables
+        float length_squared;
+        float squared_distance_to_edge;
+        float minimum_allowable_distance;
+
+        for (k = 0; k < K; k++) {
+            for (i = index_x; i < N; i += stride_x) {
+
+                p = &(X[D*i]);
+                j = edgesIn[K*i+k];
+                q = &(X[D*j]);
+
+                length_squared = 0;
+                for(d = 0; d < D; d++) {
+                    pq[d] = p[d] - q[d];
+                    length_squared += pq[d]*pq[d];
+                }
+                // A point should not be connected to itself
+                if(length_squared == 0) {
+                    edgesOut[K*i+k] = -1;
+                    continue;
+                }
+
+                // This loop presumes that all nearer neighbors have
+                // already been processed
+                for(k2 = 0; k2 < k; k2++) {
+                    n = edgesOut[K*i+k2];
+                    if (n == -1){
+                        continue;
+                    }
                     r = &(X[D*n]);
 
                     t = 0;
@@ -333,15 +417,9 @@ namespace nglcu {
         }
     }
 
-    void prune_discrete(const int N, const int D, const int K, const int steps,
-                    const float beta, const float p, float *X, int *edges) {
-        float erTemplate[steps];
-        create_template(erTemplate, beta, p, steps);
-        return prune_discrete(N, D, K, steps, erTemplate, X, edges);
-    }
-
-    void prune_discrete(const int N, const int D, const int K, const int steps,
-                    float *erTemplate, float *X, int *edges) {
+    void prune_discrete(float *X, int *edges, const int N, const int D,
+                        const int K, float *erTemplate, const int steps,
+                        const bool relaxed, const float beta, const float p) {
         float *x_d;
         int *edgesIn_d;
         int *edgesOut_d;
@@ -354,10 +432,36 @@ namespace nglcu {
         memcpy(x_d, X, N*D*sizeof(float));
         memcpy(edgesIn_d, edges, N*K*sizeof(float));
         memcpy(edgesOut_d, edges, N*K*sizeof(float));
-        memcpy(erTemplate_d, erTemplate, (steps)*sizeof(float));
 
-        prune_discrete_d<<<grid_size, block_size>>>(x_d, edgesIn_d, N, D, K, steps,
-                                                    erTemplate_d, edgesOut_d);
+        if (erTemplate != NULL) {
+            memcpy(erTemplate_d, erTemplate, (steps)*sizeof(float));
+        }
+        else {
+            float temp_erTemplate[steps];
+            create_template(temp_erTemplate, beta, p, steps);
+            memcpy(erTemplate_d, temp_erTemplate, (steps)*sizeof(float));
+        }
+
+        if (relaxed) {
+            prune_discrete_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d,
+                                                                      edgesIn_d,
+                                                                      N,
+                                                                      D,
+                                                                      K,
+                                                                      erTemplate_d,
+                                                                      steps,
+                                                                      edgesOut_d);
+        }
+        else {
+            prune_discrete_d<<<grid_size, block_size>>>(x_d,
+                                                        edgesIn_d,
+                                                        N,
+                                                        D,
+                                                        K,
+                                                        erTemplate_d,
+                                                        steps,
+                                                        edgesOut_d);
+        }
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));
@@ -371,8 +475,8 @@ namespace nglcu {
         cudaFree(erTemplate_d);
     }
 
-    void prune(const int N, const int D, const int K, float lp, float beta,
-        float *X, int *edges) {
+    void prune(float *X, int *edges, const int N, const int D, const int K,
+               bool relaxed, float beta, float lp) {
         float *x_d;
         int *edgesIn_d;
         int *edgesOut_d;
@@ -384,34 +488,13 @@ namespace nglcu {
         memcpy(edgesIn_d, edges, N*K*sizeof(float));
         memcpy(edgesOut_d, edges, N*K*sizeof(float));
 
-        prune_d<<<grid_size, block_size>>>(x_d, edgesIn_d, N, D, K, lp, beta,
-                                        edgesOut_d);
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess)
-            printf("Error: %s\n", cudaGetErrorString(err));
-        cudaDeviceSynchronize();
+        if (relaxed) {
+            prune_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, N, D, K, lp, beta, edgesOut_d);
+        }
+        else {
+            prune_d<<<grid_size, block_size>>>(x_d, edgesIn_d, N, D, K, lp, beta, edgesOut_d);
+        }
 
-        memcpy(edges, edgesOut_d, N*K*sizeof(float));
-
-        cudaFree(x_d);
-        cudaFree(edgesIn_d);
-        cudaFree(edgesOut_d);
-    }
-
-    void prune_relaxed(const int N, const int D, const int K, float lp,
-                       float beta, float *X, int *edges) {
-        float *x_d;
-        int *edgesIn_d;
-        int *edgesOut_d;
-        cudaMallocManaged(&x_d, N*D*sizeof(float));
-        cudaMallocManaged(&edgesIn_d, N*K*sizeof(int));
-        cudaMallocManaged(&edgesOut_d, N*K*sizeof(int));
-
-        memcpy(x_d, X, N*D*sizeof(float));
-        memcpy(edgesIn_d, edges, N*K*sizeof(float));
-        memcpy(edgesOut_d, edges, N*K*sizeof(float));
-
-        prune_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, N, D, K, lp, beta, edgesOut_d);
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));

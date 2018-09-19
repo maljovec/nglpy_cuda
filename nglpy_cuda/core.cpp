@@ -67,17 +67,18 @@ static PyObject* nglpy_cuda_core_min_distance_from_edge(PyObject *self, PyObject
     return Py_BuildValue("f", nglcu::min_distance_from_edge(t, beta, p));
 }
 
-static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args) {
+static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args, PyObject* kwargs) {
     int N;
     int D;
     int K;
-    int steps;
 
     // Two signatures for this method where either collection below is specified:
-    float beta;
-    float p;
+    int steps = 100;
+    float beta = 1;
+    float p = 2;
+    bool relaxed = false;
     // OR
-    PyArrayObject *template_arr;
+    PyArrayObject *template_arr = NULL;
 
     PyArrayObject *X_arr;
     PyArrayObject *edges_arr;
@@ -85,27 +86,26 @@ static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args) 
     npy_intp idx[2];
     idx[0] = idx[1] = 0;
 
-    if(PyArg_ParseTuple(args, "iiiiffO&O&", &N, &D, &K, &steps, &beta, &p, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr)) {
+    static char* argnames[] = {"X", "edges", "template", "steps", "relaxed", "beta", "lp", NULL};
+    if(PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|O&ipff", argnames, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr, PyArray_Converter, &template_arr, &steps, &relaxed, &beta, &p)) {
         float *X = (float *)PyArray_GetPtr(X_arr, idx);
         int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
-        nglcu::prune_discrete(N, D, K, steps, beta, p, X, edges);
-        Py_DECREF(X_arr);
-        return PyArray_Return(edges_arr);
-    }
-    else if (PyArg_ParseTuple(args, "iiiiO&O&O&", &N, &D, &K, &steps, PyArray_Converter, &template_arr, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr)) {
-        // The fact that we passed through the first if clause means the error
-        // indicator will be set with the following error message:
-        // TypeError: function takes exactly 8 arguments (7 given)
-        // By clearing this indicator, we are allowing the function to act in
-        // an overloaded fashion. TODO: I should probably verify that the
-        // error indicator is a PyExc_TypeError
-        PyErr_Clear();
-       	float *X = (float *)PyArray_GetPtr(X_arr, idx);
-        int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
-        float *erTemplate = (float *)PyArray_GetPtr(template_arr, idx);
-        nglcu::prune_discrete(N, D, K, steps, erTemplate, X, edges);
-        Py_DECREF(X_arr);
-        Py_DECREF(template_arr);
+
+        N = PyArray_DIM(X_arr, 0);
+        D = PyArray_DIM(X_arr, 1);
+        K = PyArray_DIM(edges_arr, 1);
+
+        if (template_arr != NULL) {
+            float *erTemplate = (float *)PyArray_GetPtr(template_arr, idx);
+            steps = PyArray_DIM(template_arr, 0);
+            nglcu::prune_discrete(X, edges, N, D, K, erTemplate, steps, relaxed, beta, p);
+            Py_DECREF(X_arr);
+            Py_DECREF(template_arr);
+        }
+        else {
+            nglcu::prune_discrete(X, edges, N, D, K, NULL, steps, relaxed, beta, p);
+            Py_DECREF(X_arr);
+        }
         return PyArray_Return(edges_arr);
     }
     else {
@@ -113,17 +113,20 @@ static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args) 
     }
 }
 
-static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args) {
+static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args, PyObject* kwargs) {
     //import_array();
+
     int N;
     int D;
     int K;
-    float lp;
-    float beta;
-    bool relaxed;
+    float lp = 2.0;
+    float beta = 1.0;
+    bool relaxed = false;
     PyArrayObject *X_arr;
     PyArrayObject *edges_arr;
-    if (!PyArg_ParseTuple(args, "iiiffpO&O&", &N, &D, &K, &lp, &beta, &relaxed, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr))
+
+    static char* argnames[] = {"X", "edges", "relaxed", "beta", "lp", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|pff", argnames, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr, &relaxed, &beta, &lp))
         return NULL;
 
     npy_intp idx[2];
@@ -131,12 +134,11 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args) {
     float *X = (float *)PyArray_GetPtr(X_arr, idx);
     int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
 
-    if (relaxed) {
-        nglcu::prune_relaxed(N, D, K, lp, beta, X, edges);
-    }
-    else {
-        nglcu::prune(N, D, K, lp, beta, X, edges);
-    }
+    N = PyArray_DIM(X_arr, 0);
+    D = PyArray_DIM(X_arr, 1);
+    K = PyArray_DIM(edges_arr, 1);
+
+    nglcu::prune(X, edges, N, D, K, relaxed, beta, lp);
 
     Py_DECREF(X_arr);
     //Py_DECREF(edges_arr);
@@ -148,8 +150,8 @@ static PyMethodDef nglpy_cuda_core_methods[] = {
     {"get_edge_list", (PyCFunction)nglpy_cuda_core_get_edge_list, METH_VARARGS, ""},
     {"create_template",(PyCFunction)nglpy_cuda_core_create_template, METH_VARARGS, ""},
     {"min_distance_from_edge",(PyCFunction)nglpy_cuda_core_min_distance_from_edge, METH_VARARGS, ""},
-    {"prune_discrete",(PyCFunction)nglpy_cuda_core_prune_discrete, METH_VARARGS, ""},
-    {"prune",(PyCFunction)nglpy_cuda_core_prune, METH_VARARGS, ""},
+    {"prune_discrete",(PyCFunction)nglpy_cuda_core_prune_discrete, METH_VARARGS|METH_KEYWORDS, ""},
+    {"prune",(PyCFunction)nglpy_cuda_core_prune, METH_VARARGS|METH_KEYWORDS, ""},
     {NULL, NULL, 0, NULL}
 };
 
