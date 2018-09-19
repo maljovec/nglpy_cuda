@@ -20,7 +20,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['numpy']
+requirements = ['numpy', 'scipy', 'sklearn']
 
 
 def find_in_path(name, path):
@@ -121,7 +121,7 @@ class custom_build_ext(build_ext):
         build_ext.build_extensions(self)
 
 
-setup_requirements = []
+setup_requirements = ['numpy']
 test_requirements = []
 
 nglpy_cuda_core = Extension('nglpy_cuda.core',
@@ -158,7 +158,7 @@ setup(
     include_package_data=True,
     keywords='nglpy_cuda',
     name='nglpy_cuda',
-    # setup_requires=setup_requirements,
+    setup_requires=setup_requirements,
     test_suite='nglpy_cuda.tests',
     # tests_require=test_requirements,
     url='https://github.com/maljovec/nglpy_cuda',
