@@ -97,6 +97,7 @@ int main(int argc, char **argv)
   cl.addArgument("-k", "-1", "K max", false);
   cl.addArgument("-b", "1.0", "Beta", false);
   cl.addArgument("-p", "2.0", "Lp-norm", false);
+  cl.addArgument("-r", "0", "Relaxed", false);
   cl.addArgument("-s", "-1", "# of Discretization Steps. Use -1 to disallow discretization.", false);
   bool hasArguments = cl.processArgs(argc, argv);
   if(!hasArguments) {
@@ -112,6 +113,7 @@ int main(int argc, char **argv)
   int K = cl.getArgInt("-k");
   int steps = cl.getArgInt("-s");
   bool discrete = steps > 0;
+  bool relaxed = cl.getArgInt("-r") > 0;
 
   float beta = cl.getArgFloat("-b");
   float lp = cl.getArgFloat("-p");
@@ -173,16 +175,24 @@ int main(int argc, char **argv)
   t1 = now();
 
   if(discrete) {
-      nglcu::create_template(referenceShape, 1, 2, steps);
-      nglcu::prune_discrete(N, D, K, steps, referenceShape, x, edgesOut);
+      std::cerr << "\tDiscrete Graph requested" << std::endl;
+      nglcu::create_template(referenceShape, beta, lp, steps);
+      nglcu::prune_discrete(x, edgesOut, N, D, K, referenceShape, steps, relaxed);
+      t2 = now();
+      std::cerr << "GPU execution with template " << t2-t1 << " s" << std::endl;
+      t1 = now();
+      nglcu::prune_discrete(x, edgesOut, N, D, K, NULL, steps, relaxed, beta, lp);
+      t2 = now();
+      std::cerr << "GPU execution without template " << t2-t1 << " s" << std::endl;
+      t1 = now();
   }
   else {
-      nglcu::prune(N, D, K, lp, beta, x, edgesOut);
-  }
+      nglcu::prune(x, edgesOut, N, D, K, relaxed, beta, lp);
 
-  t2 = now();
-  std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;
-  t1 = now();
+      t2 = now();
+      std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;
+      t1 = now();
+  }
 
   for(i = 0; i < N; i++) {
     for(k = 0; k < K; k++) {

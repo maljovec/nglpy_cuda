@@ -5,14 +5,6 @@
 
 from setuptools import setup
 
-with open('README.rst') as readme_file:
-    readme = readme_file.read()
-
-with open('HISTORY.rst') as history_file:
-    history = history_file.read()
-
-requirements = ['numpy>=1.15']
-
 ###############################################################################
 # Code from https://github.com/rmcgibbo/npcuda-example to build a custom
 # CUDA module via distutils
@@ -20,11 +12,20 @@ import os
 from os.path import join as pjoin
 from distutils.extension import Extension
 from distutils.command.build_ext import build_ext
+import numpy
+
+with open('README.rst') as readme_file:
+    readme = readme_file.read()
+
+with open('HISTORY.rst') as history_file:
+    history = history_file.read()
+
+requirements = ['numpy']
 
 
 def find_in_path(name, path):
     "Find a file in a search path"
-    # adapted fom http://code.activestate.com/recipes/52224-find-a-file-given-a-search-path/
+    # adapted fom https://bit.ly/2QEHMUt
     for dir in path.split(os.pathsep):
         binpath = pjoin(dir, name)
         if os.path.exists(binpath):
@@ -51,7 +52,8 @@ def locate_cuda():
         nvcc = find_in_path('nvcc', os.environ['PATH'])
         if nvcc is None:
             raise EnvironmentError('The nvcc binary could not be '
-                                   'located in your $PATH. Either add it to your path, or set $CUDAHOME')
+                                   'located in your $PATH. Either add '
+                                   'it to your path, or set $CUDAHOME')
         home = os.path.dirname(os.path.dirname(nvcc))
 
     cudaconfig = {'home': home,
@@ -118,9 +120,6 @@ class custom_build_ext(build_ext):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
 
-
-###############################################################################
-import numpy
 
 setup_requirements = []
 test_requirements = []

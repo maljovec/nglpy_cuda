@@ -117,7 +117,7 @@ Until I get this packaged appropriately, use the following command to compile th
 The CUDA API can then be tested with a small C++ example (TODO: provide small data file in repo for testing this next line)::
 
     g++ -L. -I include/ src/test.cpp -lnglcu -o test
-    ./test -i <input file> -d <# of dimensions> -c <# of points> -n <neighbor edge file> -k <k neighbors to prune> -b <beta parameter> -p <shape descriptor> -s <discretization steps>
+    ./test -i <input file> -d <# of dimensions> -c <# of points> -n <neighbor edge file> -k <k neighbors to prune> -b <beta parameter> -p <shape descriptor> -s <discretization steps> -r <positive integer means use the relaxed version>
 
 .. end_build
 
@@ -126,6 +126,18 @@ The CUDA API can then be tested with a small C++ example (TODO: provide small da
 Usage
 =====
 
-TODO
+The Python interface exposes the a Graph object that can be be iterated
+over its edges which produces a tuple where the first two values are the
+integer indices and the third value is the distance between the two
+points:
+
+    import numpy as np
+    import nglpy_cuda as ngl
+
+    X = np.random.uniform(size=(10, 2))
+    graph = ngl.Graph(X, relaxed=False)
+
+    for edge in graph:
+        print(edge)
 
 .. end-usage
