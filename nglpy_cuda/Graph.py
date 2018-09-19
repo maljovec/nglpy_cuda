@@ -79,8 +79,8 @@ class Graph(object):
             end_index = start_index+self.query_size
             working_set = np.array(range(start_index, end_index))
 
-            distance_matrix, edge_matrix = self.nn_index.search(working_set,
-                                                                self.max_neighbors)
+            distances, edge_matrix = self.nn_index.search(working_set,
+                                                          self.max_neighbors)
             if chunked:
 
                 # It is possible that we cannot store the entirety of X on
@@ -126,7 +126,7 @@ class Graph(object):
                 for j, q_index in enumerate(row):
                     if q_index != -1:
                         self.edge_list.put(
-                            (p_index, q_index, distance_matrix[i, j]))
+                            (p_index, q_index, distances[i, j]))
             start_index += self.query_size
         self.done = True
 

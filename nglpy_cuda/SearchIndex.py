@@ -6,6 +6,7 @@
 from abc import ABC, abstractmethod
 from .utils import *
 
+
 class SearchIndex(ABC):
     """ A neighborhood graph that represents the connectivity of a given
     data matrix.

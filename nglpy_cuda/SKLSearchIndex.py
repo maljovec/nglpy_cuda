@@ -8,6 +8,7 @@ import sklearn as skl
 from .SearchIndex import SearchIndex
 from .utils import *
 
+
 class SKLSearchIndex(SearchIndex):
     """ A neighborhood graph that represents the connectivity of a given
     data matrix.

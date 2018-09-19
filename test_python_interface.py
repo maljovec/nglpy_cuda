@@ -23,7 +23,7 @@ i32 = np.int32
 X = np.array(X, dtype=f32)
 knnAlgorithm = sklearn.neighbors.NearestNeighbors(10)
 knnAlgorithm.fit(X)
-edge_matrix = np.array(knnAlgorithm.kneighbors(X, return_distance=False), dtype=i32)
+edge_matrix = np.array(knnAlgorithm.kneighbors(X, 10, False), dtype=i32)
 
 print('Input')
 print(edge_matrix)
@@ -52,11 +52,13 @@ print(edges_discrete_out)
 
 
 edges = np.copy(edge_matrix)
-edges_discrete_out = ngl.prune_discrete(X, edges, steps=100, relaxed=False, beta=1, lp=2)
+edges_discrete_out = ngl.prune_discrete(X, edges, steps=100, relaxed=False,
+                                        beta=1, lp=2)
 print('Discrete Gabriel Graph (should be the same as the normal version')
 print(edges_discrete_out)
 
 edges = np.copy(edge_matrix)
-edges_discrete_out = ngl.prune_discrete(X, edges, steps=100, relaxed=True, beta=1, lp=2)
+edges_discrete_out = ngl.prune_discrete(X, edges, steps=100, relaxed=True,
+                                        beta=1, lp=2)
 print('Discrete Gabriel Graph (5 and 7 should be connected')
 print(edges_discrete_out)

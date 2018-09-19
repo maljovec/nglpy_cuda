@@ -8,6 +8,7 @@ import faiss
 from .SearchIndex import SearchIndex
 from .utils import *
 
+
 class FAISSSearchIndex(SearchIndex):
     """ A neighborhood graph that represents the connectivity of a given
     data matrix.
@@ -59,7 +60,7 @@ class FAISSSearchIndex(SearchIndex):
         self.index = faiss.GpuIndexFlatL2(res, d, flat_config)
         ################################################################
 
-        self.index.nprobe = 1 #256
+        self.index.nprobe = 1  # 256
 
         self.index.train(X)
         self.index.add(X)
