@@ -121,7 +121,6 @@ class custom_build_ext(build_ext):
         build_ext.build_extensions(self)
 
 
-
 setup_requirements = []
 test_requirements = []
 
