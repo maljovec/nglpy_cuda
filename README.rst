@@ -76,14 +76,11 @@ Otherwise, all other python requirements can be installed via pip::
 
 .. install
 
-.. Installation
-.. ============
-..
-..
-.. ::
-..
-..    pip install nglpy_cuda
-..
+Installation
+============
+There is an experimental package available on pip, however the prerequisite libraries are not specified correctly, so be sure you have numpy, scipy, sklearn, and faiss installed (subject to change).
+::
+    pip install nglpy_cuda
 
 .. end-install
 
