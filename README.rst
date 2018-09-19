@@ -129,7 +129,7 @@ Usage
 The Python interface exposes the a Graph object that can be be iterated
 over its edges which produces a tuple where the first two values are the
 integer indices and the third value is the distance between the two
-points:
+points::
 
     import numpy as np
     import nglpy_cuda as ngl
