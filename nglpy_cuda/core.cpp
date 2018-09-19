@@ -76,7 +76,7 @@ static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args, 
     int steps = 100;
     float beta = 1;
     float p = 2;
-    bool relaxed = false;
+    int relaxed = 0;
     // OR
     PyArrayObject *template_arr = NULL;
 
@@ -87,7 +87,7 @@ static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args, 
     idx[0] = idx[1] = 0;
 
     static char* argnames[] = {"X", "edges", "template", "steps", "relaxed", "beta", "lp", NULL};
-    if(PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|O&ipff", argnames, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr, PyArray_Converter, &template_arr, &steps, &relaxed, &beta, &p)) {
+    if(PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|O&iiff", argnames, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr, PyArray_Converter, &template_arr, &steps, &relaxed, &beta, &p)) {
         float *X = (float *)PyArray_GetPtr(X_arr, idx);
         int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
 
