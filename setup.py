@@ -11,7 +11,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['numpy>=1.15']
+requirements = ['numpy']
 
 ###############################################################################
 # Code from https://github.com/rmcgibbo/npcuda-example to build a custom
