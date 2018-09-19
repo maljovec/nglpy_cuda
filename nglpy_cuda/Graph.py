@@ -103,9 +103,10 @@ class Graph(object):
                 X = self.X
 
             if self.discrete_steps > 0:
-                edge_matrix = ngl.prune_discrete(X, edge_matrix, self.relaxed,
-                                                 self.discrete_steps,
-                                                 self.beta, self.p)
+                edge_matrix = ngl.prune_discrete(X, edge_matrix,
+                                                 relaxed=self.relaxed,
+                                                 steps=self.discrete_steps,
+                                                 beta=self.beta, lp=self.p)
             else:
                 edge_matrix = ngl.prune(X, edge_matrix, self.relaxed,
                                         self.beta, self.p)

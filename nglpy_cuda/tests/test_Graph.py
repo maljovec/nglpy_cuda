@@ -1,44 +1,10 @@
-########################################################################
-# Software License Agreement (BSD License)                             #
-#                                                                      #
-# Copyright 2018 University of Utah                                    #
-# Scientific Computing and Imaging Institute                           #
-# 72 S Central Campus Drive, Room 3750                                 #
-# Salt Lake City, UT 84112                                             #
-#                                                                      #
-# THE BSD LICENSE                                                      #
-#                                                                      #
-# Redistribution and use in source and binary forms, with or without   #
-# modification, are permitted provided that the following conditions   #
-# are met:                                                             #
-#                                                                      #
-# 1. Redistributions of source code must retain the above copyright    #
-#    notice, this list of conditions and the following disclaimer.     #
-# 2. Redistributions in binary form must reproduce the above copyright #
-#    notice, this list of conditions and the following disclaimer in   #
-#    the documentation and/or other materials provided with the        #
-#    distribution.                                                     #
-# 3. Neither the name of the copyright holder nor the names of its     #
-#    contributors may be used to endorse or promote products derived   #
-#    from this software without specific prior written permission.     #
-#                                                                      #
-# THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR #
-# IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED       #
-# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE   #
-# ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY       #
-# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL   #
-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE    #
-# GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS        #
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER #
-# IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR      #
-# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN  #
-# IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                        #
-########################################################################
-""" This module will test the functionality of nglpy.Graph when using the
-    beta skeleton graph type
+""" This module will test the functionality of nglpy.Graph when using
+    the beta skeleton graph type
 """
 import unittest
-import nglpy_cuda as nglpy
+import nglpy_cuda as ngl
+import os
+import numpy as np
 
 
 class TestGraph(unittest.TestCase):
@@ -48,96 +14,72 @@ class TestGraph(unittest.TestCase):
     def setup(self):
         """ Setup function will create a fixed point set and parameter
         settings for testing different aspects of this library.
-
-        Test graph shape:
-
-         3----2
-             /
-            1
-          /  |
-        0     4
-
-        However, the pruned edges should result in this graph:
-        expected_graph = {0: (1, 2), 1: (0, 3, 4), 2: (0, 3, 4),
-                          3: (1, 2), 4: (1, 2)}
-
-         3----2
-          | /  |
-           /1  |
-         //  | |
-        0     4
-
-        The relaxed version should look like:
-
-         3----2
-         |   /
-        |   1
-        | /  |
-        0     4
-
         """
 
-        self.points = [[0.360502, 0.535494],
-                       [0.476489, 0.560185],
-                       [0.503125, 0.601218],
-                       [0.462382, 0.666667],
-                       [0.504702, 0.5]]
-        self.max_neighbors = 4
-        self.beta = 1
-        self.graph = 'beta skeleton'
-        self.edges = [0, 1, 0, 2, 0, 3, 0, 4,
-                      1, 3, 1, 4,
-                      2, 3, 2, 4,
-                      3, 4]
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        self.points = np.loadtxt(os.path.join(dir_path, 'data', 'points.txt'))
+        gold = np.loadtxt(os.path.join(dir_path, 'data',
+                                       'gold_edges_strict.txt'))
+        self.gold_strict = set()
+        for edge in gold:
+            lo, hi = min(edge), max(edge)
+            self.gold_strict.add((lo, hi))
 
-    def test_neighbors(self):
-        """ Test Graph's ability to build knn and prune
+        gold = np.loadtxt(os.path.join(dir_path, 'data',
+                                       'gold_edges_relaxed.txt'))
+        self.gold_relaxed = set()
+        for edge in gold:
+            lo, hi = min(edge), max(edge)
+            self.gold_relaxed.add((lo, hi))
 
-            Tests the neighbors function in both settings, that is where
-            an index is supplied and when it is not. This does not use
-            an input neighborhood graph, thus NGL must prune the
-            complete graph in this case.
+    def test_strict(self):
+        """
+        Test Graph's ability to build knn and prune correctly in the
+        strict case for both discrete and continuous algorithms.
         """
         self.setup()
-        graph_rep = nglpy.Graph(self.points, self.graph, self.max_neighbors,
-                                self.beta)
-        expected_graph = {0: (1, ), 1: (0, 2, 4), 2: (1, 3), 3: (2, ),
-                          4: (1, )}
+        graph = ngl.Graph(self.points, index=None, max_neighbors=-1,
+                          relaxed=False, beta=1, p=2.0, discrete_steps=-1)
 
-        for i in range(len(self.points)):
-            expected = list(expected_graph[i])
-            actual = sorted(graph_rep.neighbors(i))
-            msg = '\nNode {} Connectivity:'.format(i)
-            msg += '\n\texpected: {}\n\tactual: {} '.format(expected, actual)
-            self.assertEqual(expected, actual, msg)
+        test = set()
+        for e1, e2, d in graph:
+            test.add((min(e1, e2), max(e1, e2)))
 
-        # This only fails because the order is messed up.
-        # self.assertEqual(graph_rep.neighbors(), expected_graph)
+        self.assertSetEqual(self.gold_strict, test)
 
-    def test_neighbors_with_edges(self):
-        """ Test Graph's ability to read a graph and prune
+        graph = ngl.Graph(self.points, index=None, max_neighbors=-1,
+                          relaxed=False, beta=1, p=2.0, discrete_steps=100)
 
-            Tests the neighbors function in both settings, that is where
-            an index is supplied and when it is not. A user supplied
-            sub-graph is used in this case. Since, this sub-graph prunes
-            valid edges, then we should see those edges removed from the
-            actual graph.
+        test = set()
+        for e1, e2, d in graph:
+            test.add((min(e1, e2), max(e1, e2)))
+
+        self.assertSetEqual(self.gold_strict, test)
+
+
+    def test_relaxed(self):
+        """
+        Test Graph's ability to build knn and prune correctly in the
+        strict case for both discrete and continuous algorithms.
         """
         self.setup()
-        graph_rep = nglpy.Graph(self.points, self.graph, self.max_neighbors,
-                                self.beta, self.edges)
+        graph = ngl.Graph(self.points, index=None, max_neighbors=-1,
+                          relaxed=True, beta=1, p=2.0, discrete_steps=-1)
 
-        expected_graph = {0: (1, ), 1: (0, 4), 2: (3, ), 3: (2, ),
-                          4: (1, )}
+        test = set()
+        for e1, e2, d in graph:
+            test.add((min(e1, e2), max(e1, e2)))
 
-        for i in range(len(self.points)):
-            expected = list(expected_graph[i])
-            actual = sorted(graph_rep.neighbors(i))
-            msg = '\nNode {} Connectivity:'.format(i)
-            msg += '\n\texpected: {}\n\tactual: {} '.format(expected, actual)
-            self.assertEqual(expected, actual, msg)
+        self.assertSetEqual(self.gold_relaxed, test)
 
-        self.assertEqual(graph_rep.neighbors(), expected_graph)
+        graph = ngl.Graph(self.points, index=None, max_neighbors=-1,
+                          relaxed=True, beta=1, p=2.0, discrete_steps=100)
+
+        test = set()
+        for e1, e2, d in graph:
+            test.add((min(e1, e2), max(e1, e2)))
+
+        self.assertSetEqual(self.gold_relaxed, test)
 
 if __name__ == '__main__':
     unittest.main()
