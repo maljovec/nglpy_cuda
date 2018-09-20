@@ -76,14 +76,11 @@ Otherwise, all other python requirements can be installed via pip::
 
 .. install
 
-.. Installation
-.. ============
-..
-..
-.. ::
-..
-..    pip install nglpy_cuda
-..
+Installation
+============
+There is an experimental package available on pip, however the prerequisite libraries are not specified correctly, so be sure you have numpy, scipy, sklearn, and faiss installed (subject to change).
+::
+    pip install nglpy_cuda
 
 .. end-install
 
@@ -129,7 +126,7 @@ Usage
 The Python interface exposes the a Graph object that can be be iterated
 over its edges which produces a tuple where the first two values are the
 integer indices and the third value is the distance between the two
-points:
+points::
 
     import numpy as np
     import nglpy_cuda as ngl
