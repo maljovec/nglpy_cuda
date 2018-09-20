@@ -52,5 +52,5 @@ class SKLSearchIndex(SearchIndex):
             edge_matrix = np.array(output[1], dtype=i32)
             return distance_matrix, edge_matrix
         else:
-            edge_matrix = np.array(output[0], dtype=i32)
+            edge_matrix = np.array(output, dtype=i32)
             return edge_matrix
