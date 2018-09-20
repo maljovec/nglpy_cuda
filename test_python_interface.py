@@ -1,17 +1,40 @@
 import numpy as np
 import nglpy_cuda as ngl
 import sklearn
+import sys
+import time
 
 ########################################################################
 # Example using the Graph class as an iterator
+# np.random.seed(2)
+# X = np.random.uniform(size=(100000, 2))
+# X = np.array(X, dtype=np.float32)
+# ########################################################################
+# start = time.process_time()
+# graph = ngl.Graph(X, index=ngl.FAISSSearchIndex(), max_neighbors=10, relaxed=False)
+# for edge in graph:
+#     pass
+# end = time.process_time()
+# print('FAISS Index: {} s'.format(end-start))
+# ########################################################################
+# start = time.process_time()
+# graph = ngl.Graph(X, max_neighbors=10, relaxed=False)
+# for edge in graph:
+#     pass
+# end = time.process_time()
+# print('SKL Index: {} s'.format(end-start))
+# sys.exit(0)
+########################################################################
+print('~'*80)
 np.random.seed(2)
 X = np.random.uniform(size=(10, 2))
-graph = ngl.Graph(X, relaxed=False)
 
-print('Iterating on edges:')
+graph = ngl.Graph(X, max_neighbors=5, relaxed=False, query_size=2)
+
 for edge in graph:
     print(edge)
 
+sys.exit(0)
 ########################################################################
 # Example of using the directly exposed GPU methods, note you will have
 # to decide what to do when the data does not fit in memory, I make an
