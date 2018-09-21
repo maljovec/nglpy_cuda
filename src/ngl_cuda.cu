@@ -21,6 +21,44 @@ namespace nglcu {
     dim3 grid_size_1D(16);
 
     __global__
+    void map_d(int *matrix, int *map, int M, int N, int K) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+        int stride_y = blockDim.y * gridDim.y;
+
+        int row, col, i;
+        for (row = index_y; row < M; row += stride_y) {
+            for (col = index_x; col < N; col += stride_x) {
+                for (i = 0; i < K; i++) {
+                    if (map[i] == matrix[row][col]) {
+                        matrix[row][col] = i;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    __global__
+    void unmap_d(int *matrix, int *map, int M, int N) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+        int stride_y = blockDim.y * gridDim.y;
+
+
+        int row, col;
+        for (row = index_y; row < M; row += stride_y) {
+            for (col = index_x; col < N; col += stride_x) {
+                matrix[row][col] = map[matrix[row][col]];
+            }
+        }
+    }
+
+    __global__
     void prune_discrete_d(float *X, int *edgesIn, const int N, const int D,
                         const int K, float *erTemplate, const int steps,
                         int *edgesOut) {
@@ -375,6 +413,52 @@ namespace nglcu {
                 }
             }
         }
+    }
+
+    void map(int *matrix, int *map, int M, int N, int K) {
+        int *matrix_d;
+        int *map_d;
+
+        cudaMallocManaged(&matrix_d, M*N*sizeof(int));
+        memcpy(matrix_d, matrix, M*N*sizeof(int));
+
+        cudaMallocManaged(&map_d, K*sizeof(int));
+        memcpy(map_d, map, K*sizeof(int));
+
+        map_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N, K);
+
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+            printf("Error: %s\n", cudaGetErrorString(err));
+        cudaDeviceSynchronize();
+
+        memcpy(matrix, matrix_d, M*N*sizeof(int));
+
+        cudaFree(matrix_d);
+        cudaFree(map_d);
+    }
+
+    void map(int *matrix, int *map, int M, int N, int K) {
+        int *matrix_d;
+        int *map_d;
+
+        cudaMallocManaged(&matrix_d, M*N*sizeof(int));
+        memcpy(matrix_d, matrix, M*N*sizeof(int));
+
+        cudaMallocManaged(&map_d, K*sizeof(int));
+        memcpy(map_d, map, K*sizeof(int));
+
+        unmap_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
+
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+            printf("Error: %s\n", cudaGetErrorString(err));
+        cudaDeviceSynchronize();
+
+        memcpy(matrix, matrix_d, M*N*sizeof(int));
+
+        cudaFree(matrix_d);
+        cudaFree(map_d);
     }
 
     float min_distance_from_edge(float t, float beta, float p) {

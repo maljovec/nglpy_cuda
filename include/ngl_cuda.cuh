@@ -16,6 +16,8 @@ namespace nglcu{
     void prune(float *X, int *edges, int N, int D, int M, int K,
                bool relaxed=false, float beta=1, float lp=2, int count=-1);
 
+    void map(int *matrix, int *map, int M, int N, int K);
+    void unmap(int *matrix, int *map, int M, int N, int K);
     void print_cuda_info();
     size_t get_available_device_memory();
 }
