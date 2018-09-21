@@ -70,6 +70,7 @@ static PyObject* nglpy_cuda_core_min_distance_from_edge(PyObject *self, PyObject
 static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args, PyObject* kwargs) {
     int N;
     int D;
+    int M;
     int K;
 
     // Two signatures for this method where either collection below is specified:
@@ -97,17 +98,18 @@ static PyObject* nglpy_cuda_core_prune_discrete(PyObject *self, PyObject *args, 
             count = N;
         }
         D = PyArray_DIM(X_arr, 1);
+        M = PyArray_DIM(edges_arr, 0);
         K = PyArray_DIM(edges_arr, 1);
 
         if (template_arr != NULL) {
             float *erTemplate = (float *)PyArray_GetPtr(template_arr, idx);
             steps = PyArray_DIM(template_arr, 0);
-            nglcu::prune_discrete(X, edges, N, D, K, erTemplate, steps, relaxed, beta, p, count);
+            nglcu::prune_discrete(X, edges, N, D, M, K, erTemplate, steps, relaxed, beta, p, count);
             Py_DECREF(X_arr);
             Py_DECREF(template_arr);
         }
         else {
-            nglcu::prune_discrete(X, edges, N, D, K, NULL, steps, relaxed, beta, p, count);
+            nglcu::prune_discrete(X, edges, N, D, M, K, NULL, steps, relaxed, beta, p, count);
             Py_DECREF(X_arr);
         }
         return PyArray_Return(edges_arr);
@@ -122,6 +124,7 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args, PyObject*
 
     int N;
     int D;
+    int M;
     int K;
     float lp = 2.0;
     float beta = 1.0;
@@ -144,9 +147,10 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args, PyObject*
         count = N;
     }
     D = PyArray_DIM(X_arr, 1);
+    M = PyArray_DIM(edges_arr, 0);
     K = PyArray_DIM(edges_arr, 1);
 
-    nglcu::prune(X, edges, N, D, K, relaxed, beta, lp, count);
+    nglcu::prune(X, edges, N, D, M, K, relaxed, beta, lp, count);
 
     Py_DECREF(X_arr);
     //Py_DECREF(edges_arr);

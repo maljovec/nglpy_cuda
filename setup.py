@@ -5,7 +5,7 @@
 
 from setuptools import setup
 
-###############################################################################
+########################################################################
 # Code from https://github.com/rmcgibbo/npcuda-example to build a custom
 # CUDA module via distutils
 import os
