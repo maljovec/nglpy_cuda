@@ -6,8 +6,9 @@ from queue import Queue, Empty
 
 import nglpy_cuda as ngl
 import numpy as np
+import time
 
-from .utils import f32
+from .utils import f32, i32
 from .SKLSearchIndex import SKLSearchIndex
 
 
@@ -95,9 +96,11 @@ class Graph(object):
 
         self.query_size = int(query_size)
 
-        # print('Problem Size: {}'.format(N))
-        # print('  Query Size: {}'.format(self.query_size))
-        # print('  GPU Memory: {}'.format(ngl.get_available_device_memory()))
+        print('Problem Size: {}'.format(N))
+        print('  Query Size: {}'.format(self.query_size))
+        print('  GPU Memory: {}'.format(ngl.get_available_device_memory()))
+        self.chunked = self.X.shape[0] > self.query_size
+        print('     Chunked: {}'.format(self.chunked))
 
         self.edge_list = Queue(self.query_size*10)
         self.done = False
@@ -109,14 +112,17 @@ class Graph(object):
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
         # print('Working Set: {}'.format(str(working_set)))
+        start = time.process_time()
         distances, edge_matrix = self.nn_index.search(working_set,
                                                       self.max_neighbors)
+        end = time.process_time()
+        print('skl query: {} '.format(end-start))
 
         indices = working_set
         # We will need the locations of these additional points since
         # we need to know if they fall into the empty region of any
         # edges above
-        additional_indices = np.setdiff1d(edge_matrix.flatten(),
+        additional_indices = np.setdiff1d(edge_matrix.ravel(),
                                           working_set)
 
         # print('Additional indices needed: {}'.format(str(additional_indices)))
@@ -127,9 +133,12 @@ class Graph(object):
             # replace the edge_matrix values
             indices = np.hstack((working_set, additional_indices))
             if not self.relaxed:
+                start = time.process_time()
                 neighbor_matrix = self.nn_index.search(additional_indices,
                                                        self.max_neighbors,
                                                        False)
+                end = time.process_time()
+                print('secondary skl query: {} s'.format(end-start))
 
                 # We don't care about whether any of the edges of these
                 # extra rows are valid yet, but the algorithm will need
@@ -139,9 +148,8 @@ class Graph(object):
                 # Since we will be using the edges above for queries, we
                 # need to make sure we have the locations of everything
                 # they touch
-                neighbor_indices = np.setdiff1d(neighbor_matrix.flatten(),
+                neighbor_indices = np.setdiff1d(neighbor_matrix.ravel(),
                                                 indices)
-
                 # print('Additional neighboring indices needed: {}'.format(str(neighbor_indices)))
                 if neighbor_indices.shape[0] > 0:
                     indices = np.hstack((indices, neighbor_indices))
@@ -151,14 +159,19 @@ class Graph(object):
         X = self.X[indices, :]
 
         # Create a lookup for the new indices in the sub-array
-        index_map = {}
-        for i, key in enumerate(indices):
-            index_map[key] = i
+        new_indices = np.arange(indices.size, dtype=i32)
+        indices = np.append(indices, [-1]).astype(i32)
+        new_indices = np.append(new_indices, [-1]).astype(i32)
 
-        for i in range(edge_matrix.shape[0]):
-            for j in range(edge_matrix.shape[1]):
-                if edge_matrix[i, j] != -1:
-                    edge_matrix[i, j] = index_map[edge_matrix[i, j]]
+        # This is significantly faster than most other methods for
+        # replacing values of an array with a map of different values
+        # Extracted from stack overflow: https://bit.ly/2O0o4Us
+        sort_idx = np.argsort(indices)
+        idx = np.searchsorted(indices, edge_matrix, sorter=sort_idx)
+        edge_matrix = new_indices[sort_idx][idx]
+
+        end = time.process_time()
+        print('update edge matrix time: {} s'.format(end-start))
 
         if self.discrete_steps > 0:
             edge_matrix = ngl.prune_discrete(X,
@@ -169,25 +182,34 @@ class Graph(object):
                                              lp=self.p,
                                              count=count)
         else:
+            start = time.process_time()
             edge_matrix = ngl.prune(X,
                                     edge_matrix,
                                     relaxed=self.relaxed,
                                     beta=self.beta,
                                     lp=self.p,
                                     count=count)
+            end = time.process_time()
+            print('GPU time: {} s'.format(end-start))
 
+        start = time.process_time()
         # Reverse the lookup to the original indices of the whole array
-        index_map = {v: k for k, v in index_map.items()}
-        for i in range(count):
-            for j in range(edge_matrix.shape[1]):
-                if edge_matrix[i, j] != -1:
-                    edge_matrix[i, j] = index_map[edge_matrix[i, j]]
+        # index_map = {v: k for k, v in index_map.items()}
+        # for i in range(count):
+        #     for j in range(edge_matrix.shape[1]):
+        #         if edge_matrix[i, j] != -1:
+        #             edge_matrix[i, j] = index_map[edge_matrix[i, j]]
+        sort_idx = np.argsort(new_indices)
+        idx = np.searchsorted(new_indices, edge_matrix[:count], sorter=sort_idx)
+        edge_matrix = indices[sort_idx][idx]
 
-        for i, row in enumerate(edge_matrix[:count]):
+        for i, row in enumerate(edge_matrix):
             p_index = start_index+i
             for j, q_index in enumerate(row):
                 if q_index != -1:
                     self.edge_list.put((p_index, q_index, distances[i, j]))
+        end = time.process_time()
+        print('post-process time: {} s'.format(end-start))
 
     def populate_whole(self):
         count = self.X.shape[0]
@@ -214,12 +236,13 @@ class Graph(object):
 
     def populate(self):
         try:
-            chunked = self.X.shape[0] > self.query_size
-            print('     Chunked: {}'.format(chunked))
-            if chunked:
+            if self.chunked:
                 start_index = 0
                 while start_index < self.X.shape[0]:
+                    start = time.process_time()
                     self.populate_chunk(start_index)
+                    end = time.process_time()
+                    print('populate chunk {} s'.format(end-start))
                     start_index += self.query_size
             else:
                 self.populate_whole()

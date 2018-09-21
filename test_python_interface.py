@@ -6,24 +6,27 @@ import time
 
 ########################################################################
 # Example using the Graph class as an iterator
-# np.random.seed(2)
-# X = np.random.uniform(size=(100000, 2))
-# X = np.array(X, dtype=np.float32)
-# ########################################################################
-# start = time.process_time()
-# graph = ngl.Graph(X, index=ngl.FAISSSearchIndex(), max_neighbors=10, relaxed=False)
-# for edge in graph:
-#     pass
-# end = time.process_time()
-# print('FAISS Index: {} s'.format(end-start))
-# ########################################################################
-# start = time.process_time()
-# graph = ngl.Graph(X, max_neighbors=10, relaxed=False)
-# for edge in graph:
-#     pass
-# end = time.process_time()
-# print('SKL Index: {} s'.format(end-start))
-# sys.exit(0)
+seed = 0
+N = 10000000
+D = 5
+K = 300
+
+np.random.seed(seed)
+X = np.random.uniform(size=(N, D))
+X = np.array(X, dtype=np.float32)
+search_indices = {}
+# search_indices['FAISS'] = ngl.FAISSSearchIndex()
+search_indices['SKL'] = ngl.SKLSearchIndex()
+for name, index in search_indices.items():
+    start = time.process_time()
+    graph = ngl.Graph(X, index=index, max_neighbors=K, relaxed=True)
+    count = 0
+    for edge in graph:
+        count += 1
+    end = time.process_time()
+    print('')
+    print('{} Index: {} s ({} edges)'.format(name, end-start, count))
+sys.exit(0)
 ########################################################################
 print('~'*80)
 np.random.seed(2)
