@@ -154,84 +154,32 @@ class Graph(object):
                 if neighbor_indices.shape[0] > 0:
                     indices = np.hstack((indices, neighbor_indices))
 
-        # print('All Indices: {}'.format(str(indices)))
-
         X = self.X[indices, :]
-
-        em2 = np.copy(edge_matrix)
-
         start = time.process_time()
-        print(em2.dtype, indices.dtype)
-        em2 = ngl.map_indices(em2, indices)
-        end = time.process_time()
-        print('\tMap GPU time: {} s'.format(end-start))
-
-        start = time.process_time()
-        # Create a lookup for the new indices in the sub-array
-        new_indices = np.arange(indices.size, dtype=i32)
-        indices = np.append(indices, [-1]).astype(i32)
-        new_indices = np.append(new_indices, [-1]).astype(i32)
-
-        # This is significantly faster than most other methods for
-        # replacing values of an array with a map of different values
-        # Extracted from stack overflow: https://bit.ly/2O0o4Us
-        sort_idx = np.argsort(indices)
-        idx = np.searchsorted(indices, edge_matrix, sorter=sort_idx)
-        edge_matrix = new_indices[sort_idx][idx]
-
-        end = time.process_time()
-        print('\tMap  np time: {} s'.format(end-start))
-
-        if np.sum(np.equal(edge_matrix, em2)) != em2.shape[0]*em2.shape[1]:
-            print('#'*80)
-            print('Something went wrong!', em2.shape[0]*em2.shape[1] - np.sum(np.equal(edge_matrix, em2)))
-            print('#'*80)
-
         if self.discrete_steps > 0:
             edge_matrix = ngl.prune_discrete(X,
                                              edge_matrix,
+                                             indices=indices,
                                              relaxed=self.relaxed,
                                              steps=self.discrete_steps,
                                              beta=self.beta,
                                              lp=self.p,
                                              count=count)
         else:
-            start = time.process_time()
             edge_matrix = ngl.prune(X,
                                     edge_matrix,
+                                    indices=indices,
                                     relaxed=self.relaxed,
                                     beta=self.beta,
                                     lp=self.p,
                                     count=count)
-            end = time.process_time()
-            print('GPU time: {} s'.format(end-start))
-
-        em2 = np.copy(edge_matrix)
-
-        start = time.process_time()
-        # Reverse the lookup to the original indices of the whole array
-        sort_idx = np.argsort(new_indices)
-        idx = np.searchsorted(new_indices, edge_matrix[:count], sorter=sort_idx)
-        edge_matrix = indices[sort_idx][idx]
         end = time.process_time()
-        print('\tUnmap  np time: {} s'.format(end-start))
+        print('GPU time: {} s'.format(end-start))
 
         start = time.process_time()
-        em2 = ngl.unmap_indices(em2[:count], indices)
-        end = time.process_time()
-        print('\tUnmap GPU time: {} s'.format(end-start))
-
-        if np.sum(np.equal(edge_matrix, em2)) != em2.shape[0]*em2.shape[1]:
-            print('#'*80)
-            print('Something went wrong!', em2.shape[0]*em2.shape[1] - np.sum(np.equal(edge_matrix, em2)))
-            print('#'*80)
-
-        start = time.process_time()
-        for i, row in enumerate(edge_matrix):
-            p_index = start_index+i
-            for j, q_index in enumerate(row):
-                if q_index != -1:
-                    self.edge_list.put((p_index, q_index, distances[i, j]))
+        valid_edges = ngl.get_edge_list(edge_matrix, distances)
+        for edge in valid_edges:
+            self.edge_list.put(edge)
         end = time.process_time()
         print('\tList time: {} s'.format(end-start))
 

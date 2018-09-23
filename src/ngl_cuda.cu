@@ -1,6 +1,9 @@
 #include "ngl_cuda.cuh"
 #include <cstdio>
+#include <map>
+
 #include <iostream>
+#include <chrono>
 
 #define cudaErrchk(ans) { GPUAssert((ans), __FILE__, __LINE__); }
 inline void GPUAssert(cudaError_t code, const char *file, int line,
@@ -424,58 +427,31 @@ namespace nglcu {
         }
     }
 
-    void map_indices(int *matrix, int *map, int M, int N, int K) {
-        int *matrix_d;
-        int *map_d;
-        bool *mask_d;
-
-        std::cout << "M="<< M << " N=" << N << " K=" << K << std::endl;
-
-        cudaMallocManaged(&matrix_d, M*N*sizeof(int));
-        memcpy(matrix_d, matrix, M*N*sizeof(int));
-
-        cudaMallocManaged(&mask_d, M*N*sizeof(bool));
-        cudaMemset(mask_d, false, M*N*sizeof(bool));
-
-        std::cout << "Apple" << std::endl;
-        cudaMallocManaged(&map_d, K*sizeof(int));
-        memcpy(map_d, map, K*sizeof(int));
-
-        std::cout << "Banana" << std::endl;
-        // So, it turns out there is a limit to how much each thread
-        // can loop before it decides to throw an error, so let's only
-        // try to replace a fraction of the indices at a time.
-        int num_k = 10000;
-        for (int k = 0; k < K; k+=num_k) {
-            if (k+num_k >= K) {
-                num_k = K-k;
-            }
-            map_indices_d<<<grid_size, block_size>>>(matrix_d, mask_d, map_d, M, N, k, k+num_k);
+    void map_indices_cpu(int *matrix, int *map, int M, int N, int K) {
+        std::map<int, int> lookup;
+        int i, j;
+        for(i = 0; i < K; i++) {
+            lookup[map[i]] = i;
         }
+        lookup[-1] = -1;
 
+        for(i = 0; i < M; i++) {
+            for(j = 0; j < N; j++) {
+                matrix[i*N+j] = lookup[matrix[i*N+j]];
+            }
+        }
+    }
 
-        std::cout << "Cherry" << std::endl;
+    void map_indices(int *matrix_d, int *map_d, int M, int N) {
+        unmap_indices_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
-
-
-        std::cout << "Durian" << std::endl;
-        memcpy(matrix, matrix_d, M*N*sizeof(int));
-        std::cout << "Elderberry" << std::endl;
-
-        cudaFree(matrix_d);
-        cudaFree(mask_d);
-        cudaFree(map_d);
     }
 
-    void unmap_indices(int *matrix, int *map, int M, int N, int K) {
-        int *matrix_d;
+    void unmap_indices(int *matrix_d, int *map, int M, int N, int K) {
         int *map_d;
-
-        cudaMallocManaged(&matrix_d, M*N*sizeof(int));
-        memcpy(matrix_d, matrix, M*N*sizeof(int));
 
         cudaMallocManaged(&map_d, K*sizeof(int));
         memcpy(map_d, map, K*sizeof(int));
@@ -486,10 +462,6 @@ namespace nglcu {
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
-
-        memcpy(matrix, matrix_d, M*N*sizeof(int));
-
-        cudaFree(matrix_d);
         cudaFree(map_d);
     }
 
@@ -533,7 +505,7 @@ namespace nglcu {
         }
     }
 
-    void prune_discrete(float *X, int *edges, int N, int D, int M, int K,
+    void prune_discrete(float *X, int *edges, int *indices, int N, int D, int M, int K,
                         float *erTemplate, int steps, bool relaxed, float beta,
                         float p, int count) {
         float *x_d;
@@ -545,14 +517,28 @@ namespace nglcu {
             count = N;
         }
 
-        cudaErrchk(cudaMallocManaged(&x_d, N*D*sizeof(float)));
-        memcpy(x_d, X, N*D*sizeof(float));
-
         cudaErrchk(cudaMallocManaged(&edgesIn_d, M*K*sizeof(int)));
         memcpy(edgesIn_d, edges, M*K*sizeof(int));
 
         cudaErrchk(cudaMallocManaged(&edgesOut_d, count*K*sizeof(int)));
         memcpy(edgesOut_d, edges, count*K*sizeof(int));
+
+        if (indices != NULL) {
+            int *map_d;
+            int i;
+
+            cudaMallocManaged(&map_d, N*sizeof(int));
+            for(i = 0; i < count; i++) {
+                map_d[indices[i]] = i;
+            }
+            map_indices(edgesIn_d, map_d, M, K);
+            map_indices(edgesOut_d, map_d, M, K);
+            cudaFree(map_d);
+        }
+
+        cudaErrchk(cudaMallocManaged(&x_d, N*D*sizeof(float)));
+        memcpy(x_d, X, N*D*sizeof(float));
+
 
         cudaErrchk(cudaMallocManaged(&erTemplate_d, steps*sizeof(float)));
         if (erTemplate != NULL) {
@@ -589,6 +575,10 @@ namespace nglcu {
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
 
+        if (indices != NULL) {
+            unmap_indices(edgesOut_d, indices, M, K, count);
+        }
+
         memcpy(edges, edgesOut_d, count*K*sizeof(int));
 
         cudaFree(x_d);
@@ -597,25 +587,51 @@ namespace nglcu {
         cudaFree(erTemplate_d);
     }
 
-    void prune(float *X, int *edges, int N, int D, int M, int K, bool relaxed,
-               float beta, float lp, int count) {
+    void prune(float *X, int *edges, int *indices, int N, int D, int M, int K,
+               bool relaxed, float beta, float lp, int count) {
         float *x_d;
         int *edgesIn_d;
         int *edgesOut_d;
+
+        auto start = std::chrono::high_resolution_clock::now();
+        auto finish = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed;
 
         if (count < 0) {
             count = N;
         }
 
-        cudaMallocManaged(&x_d, N*D*sizeof(float));
-        memcpy(x_d, X, N*D*sizeof(float));
-
+        start = std::chrono::high_resolution_clock::now();
         cudaMallocManaged(&edgesIn_d, M*K*sizeof(int));
         memcpy(edgesIn_d, edges, M*K*sizeof(int));
 
         cudaMallocManaged(&edgesOut_d, count*K*sizeof(int));
         memcpy(edgesOut_d, edges, count*K*sizeof(int));
 
+        if (indices != NULL) {
+            int *map_d;
+            int i;
+
+            cudaMallocManaged(&map_d, N*sizeof(int));
+            for(i = 0; i < count; i++) {
+                map_d[indices[i]] = i;
+            }
+            map_indices(edgesIn_d, map_d, M, K);
+            map_indices(edgesOut_d, map_d, M, K);
+            cudaFree(map_d);
+        }
+        finish = std::chrono::high_resolution_clock::now();
+        elapsed = finish - start;
+        std::cout << "Allocate and Map time: " << elapsed.count() << " s\n";
+
+        start = std::chrono::high_resolution_clock::now();
+        cudaMallocManaged(&x_d, N*D*sizeof(float));
+        memcpy(x_d, X, N*D*sizeof(float));
+        finish = std::chrono::high_resolution_clock::now();
+        elapsed = finish - start;
+        std::cout << "Malloc time: " << elapsed.count() << " s\n";
+
+        start = std::chrono::high_resolution_clock::now();
         if (relaxed) {
             prune_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, count, D, K, lp, beta, edgesOut_d);
         }
@@ -627,12 +643,26 @@ namespace nglcu {
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
+        finish = std::chrono::high_resolution_clock::now();
+        elapsed = finish - start;
+        std::cout << "Prune time: " << elapsed.count() << " s\n";
 
+        start = std::chrono::high_resolution_clock::now();
+        if (indices != NULL) {
+            unmap_indices(edgesOut_d, indices, M, K, count);
+        }
+        finish = std::chrono::high_resolution_clock::now();
+        elapsed = finish - start;
+        std::cout << "Unmap time: " << elapsed.count() << " s\n";
+
+        start = std::chrono::high_resolution_clock::now();
         memcpy(edges, edgesOut_d, count*K*sizeof(int));
-
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
+        finish = std::chrono::high_resolution_clock::now();
+        elapsed = finish - start;
+        std::cout << "Finalize time: " << elapsed.count() << " s\n";
     }
 
     void print_cuda_info() {
