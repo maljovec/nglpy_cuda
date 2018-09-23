@@ -7,19 +7,19 @@ import time
 ########################################################################
 # Example using the Graph class as an iterator
 seed = 0
-N = 10000000
-D = 5
-K = 300
+N = 500000
+D = 2
+K = 100
 
 np.random.seed(seed)
 X = np.random.uniform(size=(N, D))
 X = np.array(X, dtype=np.float32)
 search_indices = {}
-# search_indices['FAISS'] = ngl.FAISSSearchIndex()
+#search_indices['FAISS'] = ngl.FAISSSearchIndex()
 search_indices['SKL'] = ngl.SKLSearchIndex()
 for name, index in search_indices.items():
     start = time.process_time()
-    graph = ngl.Graph(X, index=index, max_neighbors=K, relaxed=True)
+    graph = ngl.Graph(X, index=index, max_neighbors=K, relaxed=True, query_size=100000)
     count = 0
     for edge in graph:
         count += 1

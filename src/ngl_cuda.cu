@@ -1,8 +1,6 @@
 #include "ngl_cuda.cuh"
 #include <cstdio>
-#include <vector>
-#include <map>
-#include <algorithm>
+#include <iostream>
 
 #define cudaErrchk(ans) { GPUAssert((ans), __FILE__, __LINE__); }
 inline void GPUAssert(cudaError_t code, const char *file, int line,
@@ -21,7 +19,7 @@ namespace nglcu {
     dim3 grid_size_1D(16);
 
     __global__
-    void map_d(int *matrix, int *map, int M, int N, int K) {
+    void map_indices_d(int *matrix, bool *mask, int *map, int M, int N, int start_K, int end_K) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
 
@@ -29,20 +27,29 @@ namespace nglcu {
         int stride_y = blockDim.y * gridDim.y;
 
         int row, col, i;
+        int temp;
         for (row = index_y; row < M; row += stride_y) {
             for (col = index_x; col < N; col += stride_x) {
-                for (i = 0; i < K; i++) {
-                    if (map[i] == matrix[row][col]) {
-                        matrix[row][col] = i;
-                        break;
-                    }
+                temp = matrix[row*N+col];
+                if (temp == -1 || mask[row*N+col]) {
+                    continue;
                 }
+
+                i = start_K;
+                while ( i < end_K && map[i] != temp) {
+                    i++;
+                }
+                if (i < end_K) {
+                    temp = i;
+                    mask[row*N+col] = true;
+                }
+                matrix[row*N+col] = temp;
             }
         }
     }
 
     __global__
-    void unmap_d(int *matrix, int *map, int M, int N) {
+    void unmap_indices_d(int *matrix, int *map, int M, int N) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
 
@@ -53,7 +60,9 @@ namespace nglcu {
         int row, col;
         for (row = index_y; row < M; row += stride_y) {
             for (col = index_x; col < N; col += stride_x) {
-                matrix[row][col] = map[matrix[row][col]];
+                if(matrix[row*N+col] != -1) {
+                    matrix[row*N+col] = map[matrix[row*N+col]];
+                }
             }
         }
     }
@@ -415,30 +424,53 @@ namespace nglcu {
         }
     }
 
-    void map(int *matrix, int *map, int M, int N, int K) {
+    void map_indices(int *matrix, int *map, int M, int N, int K) {
         int *matrix_d;
         int *map_d;
+        bool *mask_d;
+
+        std::cout << "M="<< M << " N=" << N << " K=" << K << std::endl;
 
         cudaMallocManaged(&matrix_d, M*N*sizeof(int));
         memcpy(matrix_d, matrix, M*N*sizeof(int));
 
+        cudaMallocManaged(&mask_d, M*N*sizeof(bool));
+        cudaMemset(mask_d, false, M*N*sizeof(bool));
+
+        std::cout << "Apple" << std::endl;
         cudaMallocManaged(&map_d, K*sizeof(int));
         memcpy(map_d, map, K*sizeof(int));
 
-        map_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N, K);
+        std::cout << "Banana" << std::endl;
+        // So, it turns out there is a limit to how much each thread
+        // can loop before it decides to throw an error, so let's only
+        // try to replace a fraction of the indices at a time.
+        int num_k = 10000;
+        for (int k = 0; k < K; k+=num_k) {
+            if (k+num_k >= K) {
+                num_k = K-k;
+            }
+            map_indices_d<<<grid_size, block_size>>>(matrix_d, mask_d, map_d, M, N, k, k+num_k);
+        }
 
+
+        std::cout << "Cherry" << std::endl;
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
 
+
+        std::cout << "Durian" << std::endl;
         memcpy(matrix, matrix_d, M*N*sizeof(int));
+        std::cout << "Elderberry" << std::endl;
 
         cudaFree(matrix_d);
+        cudaFree(mask_d);
         cudaFree(map_d);
     }
 
-    void map(int *matrix, int *map, int M, int N, int K) {
+    void unmap_indices(int *matrix, int *map, int M, int N, int K) {
         int *matrix_d;
         int *map_d;
 
@@ -448,7 +480,7 @@ namespace nglcu {
         cudaMallocManaged(&map_d, K*sizeof(int));
         memcpy(map_d, map, K*sizeof(int));
 
-        unmap_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
+        unmap_indices_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
 
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess)
@@ -601,19 +633,6 @@ namespace nglcu {
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
-    }
-
-    vector_edge get_edge_list(int *edges, int N, int K) {
-        int i, k;
-        vector_edge edge_list;
-        for(i = 0; i < N; i++) {
-            for(k = 0; k < K; k++) {
-                if (edges[i*K+k] != -1) {
-                    edge_list.push_back(std::make_pair(i, edges[i*K+k]));
-                }
-            }
-        }
-        return edge_list;
     }
 
     void print_cuda_info() {

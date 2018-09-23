@@ -116,7 +116,7 @@ class Graph(object):
         distances, edge_matrix = self.nn_index.search(working_set,
                                                       self.max_neighbors)
         end = time.process_time()
-        print('skl query: {} '.format(end-start))
+        print('\tskl query: {} '.format(end-start))
 
         indices = working_set
         # We will need the locations of these additional points since
@@ -138,7 +138,7 @@ class Graph(object):
                                                        self.max_neighbors,
                                                        False)
                 end = time.process_time()
-                print('secondary skl query: {} s'.format(end-start))
+                print('\tsecondary skl query: {} s'.format(end-start))
 
                 # We don't care about whether any of the edges of these
                 # extra rows are valid yet, but the algorithm will need
@@ -158,6 +158,15 @@ class Graph(object):
 
         X = self.X[indices, :]
 
+        em2 = np.copy(edge_matrix)
+
+        start = time.process_time()
+        print(em2.dtype, indices.dtype)
+        em2 = ngl.map_indices(em2, indices)
+        end = time.process_time()
+        print('\tMap GPU time: {} s'.format(end-start))
+
+        start = time.process_time()
         # Create a lookup for the new indices in the sub-array
         new_indices = np.arange(indices.size, dtype=i32)
         indices = np.append(indices, [-1]).astype(i32)
@@ -171,7 +180,12 @@ class Graph(object):
         edge_matrix = new_indices[sort_idx][idx]
 
         end = time.process_time()
-        print('update edge matrix time: {} s'.format(end-start))
+        print('\tMap  np time: {} s'.format(end-start))
+
+        if np.sum(np.equal(edge_matrix, em2)) != em2.shape[0]*em2.shape[1]:
+            print('#'*80)
+            print('Something went wrong!', em2.shape[0]*em2.shape[1] - np.sum(np.equal(edge_matrix, em2)))
+            print('#'*80)
 
         if self.discrete_steps > 0:
             edge_matrix = ngl.prune_discrete(X,
@@ -192,24 +206,34 @@ class Graph(object):
             end = time.process_time()
             print('GPU time: {} s'.format(end-start))
 
+        em2 = np.copy(edge_matrix)
+
         start = time.process_time()
         # Reverse the lookup to the original indices of the whole array
-        # index_map = {v: k for k, v in index_map.items()}
-        # for i in range(count):
-        #     for j in range(edge_matrix.shape[1]):
-        #         if edge_matrix[i, j] != -1:
-        #             edge_matrix[i, j] = index_map[edge_matrix[i, j]]
         sort_idx = np.argsort(new_indices)
         idx = np.searchsorted(new_indices, edge_matrix[:count], sorter=sort_idx)
         edge_matrix = indices[sort_idx][idx]
+        end = time.process_time()
+        print('\tUnmap  np time: {} s'.format(end-start))
 
+        start = time.process_time()
+        em2 = ngl.unmap_indices(em2[:count], indices)
+        end = time.process_time()
+        print('\tUnmap GPU time: {} s'.format(end-start))
+
+        if np.sum(np.equal(edge_matrix, em2)) != em2.shape[0]*em2.shape[1]:
+            print('#'*80)
+            print('Something went wrong!', em2.shape[0]*em2.shape[1] - np.sum(np.equal(edge_matrix, em2)))
+            print('#'*80)
+
+        start = time.process_time()
         for i, row in enumerate(edge_matrix):
             p_index = start_index+i
             for j, q_index in enumerate(row):
                 if q_index != -1:
                     self.edge_list.put((p_index, q_index, distances[i, j]))
         end = time.process_time()
-        print('post-process time: {} s'.format(end-start))
+        print('\tList time: {} s'.format(end-start))
 
     def populate_whole(self):
         count = self.X.shape[0]

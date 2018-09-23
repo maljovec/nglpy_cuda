@@ -2,6 +2,7 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include "numpy/arrayobject.h"
 #include "ngl_cuda.h"
+#include <iostream>
 
 static PyObject* nglpy_cuda_core_get_edge_list(PyObject *self, PyObject *args) {
     int N;
@@ -162,12 +163,71 @@ static PyObject* nglpy_cuda_core_get_available_memory(PyObject *self) {
     return Py_BuildValue("i", (int)nglcu::get_available_device_memory());
 }
 
+
+static PyObject* nglpy_cuda_core_map_indices(PyObject *self, PyObject *args, PyObject* kwargs) {
+    int M;
+    int N;
+    int K;
+    PyArrayObject *matrix_arr;
+    PyArrayObject *indices_arr;
+
+    static char* argnames[] = {"X", "indices", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&", argnames, PyArray_Converter, &matrix_arr, PyArray_Converter, &indices_arr))
+        return NULL;
+
+    npy_intp idx[2];
+    idx[0] = idx[1] = 0;
+    int *matrix = (int *)PyArray_GetPtr(matrix_arr, idx);
+    int *indices = (int *)PyArray_GetPtr(indices_arr, idx);
+
+    M = PyArray_DIM(matrix_arr, 0);
+    N = PyArray_DIM(matrix_arr, 1);
+    K = PyArray_DIM(indices_arr, 0);
+
+    std::cout << "M="<< M << " N=" << N << " K=" << K << std::endl;
+
+    nglcu::map_indices(matrix, indices, M, N, K);
+
+    Py_DECREF(indices_arr);
+
+    return PyArray_Return(matrix_arr);
+}
+
+static PyObject* nglpy_cuda_core_unmap_indices(PyObject *self, PyObject *args, PyObject* kwargs) {
+    int M;
+    int N;
+    int K;
+    PyArrayObject *matrix_arr;
+    PyArrayObject *indices_arr;
+
+    static char* argnames[] = {"X", "indices", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&", argnames, PyArray_Converter, &matrix_arr, PyArray_Converter, &indices_arr))
+        return NULL;
+
+    npy_intp idx[2];
+    idx[0] = idx[1] = 0;
+    int *matrix = (int *)PyArray_GetPtr(matrix_arr, idx);
+    int *indices = (int *)PyArray_GetPtr(indices_arr, idx);
+
+    M = PyArray_DIM(matrix_arr, 0);
+    N = PyArray_DIM(matrix_arr, 1);
+    K = PyArray_DIM(indices_arr, 0);
+
+    nglcu::unmap_indices(matrix, indices, M, N, K);
+
+    Py_DECREF(indices_arr);
+
+    return PyArray_Return(matrix_arr);
+}
+
 static PyMethodDef nglpy_cuda_core_methods[] = {
     {"get_edge_list", (PyCFunction)nglpy_cuda_core_get_edge_list, METH_VARARGS, ""},
     {"create_template",(PyCFunction)nglpy_cuda_core_create_template, METH_VARARGS, ""},
     {"min_distance_from_edge",(PyCFunction)nglpy_cuda_core_min_distance_from_edge, METH_VARARGS, ""},
     {"prune_discrete",(PyCFunction)nglpy_cuda_core_prune_discrete, METH_VARARGS|METH_KEYWORDS, ""},
     {"prune",(PyCFunction)nglpy_cuda_core_prune, METH_VARARGS|METH_KEYWORDS, ""},
+    {"map_indices",(PyCFunction)nglpy_cuda_core_map_indices, METH_VARARGS|METH_KEYWORDS, ""},
+    {"unmap_indices",(PyCFunction)nglpy_cuda_core_unmap_indices, METH_VARARGS|METH_KEYWORDS, ""},
     {"get_available_device_memory",(PyCFunction)nglpy_cuda_core_get_available_memory, METH_NOARGS, ""},
     {NULL, NULL, 0, NULL}
 };
