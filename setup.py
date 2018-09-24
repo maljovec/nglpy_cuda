@@ -23,6 +23,22 @@ with open('HISTORY.rst') as history_file:
 requirements = ['numpy', 'scipy', 'sklearn']
 
 
+def get_property(prop, project):
+    """
+        Helper function for retrieving properties from a project's
+        __init__.py file
+        @In, prop, string representing the property to be retrieved
+        @In, project, string representing the project from which we will
+        retrieve the property
+        @Out, string, the value of the found property
+    """
+    result = re.search(
+        r'{}\s*=\s*[\'"]([^\'"]*)[\'"]'.format(prop),
+        open(project + "/__init__.py").read(),
+    )
+    return result.group(1)
+
+
 def find_in_path(name, path):
     "Find a file in a search path"
     # adapted fom https://bit.ly/2QEHMUt
@@ -121,6 +137,7 @@ class custom_build_ext(build_ext):
         build_ext.build_extensions(self)
 
 
+VERSION = get_property("__version__", "nglpy_cuda")
 setup_requirements = ['numpy']
 test_requirements = []
 
@@ -162,7 +179,7 @@ setup(
     test_suite='nglpy_cuda.tests',
     # tests_require=test_requirements,
     url='https://github.com/maljovec/nglpy_cuda',
-    version='0.1.0',
+    version=VERSION,
     zip_safe=False,
     ext_modules=[nglpy_cuda_core],
     cmdclass={'build_ext': custom_build_ext},
