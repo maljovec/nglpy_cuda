@@ -102,7 +102,7 @@ class TestAPI(unittest.TestCase):
         ngl_edges = ngl.prune(self.X, self.edges)
         edge_list = ngl.get_edge_list(ngl_edges, np.zeros(ngl_edges.shape))
         edge_set = set()
-        for (p,q,d) in edge_list:
+        for (p, q, d) in edge_list:
             lo = min(p, q)
             hi = max(p, q)
             edge_set.add((lo, hi))

@@ -6,7 +6,6 @@ from queue import Queue, Empty
 
 import nglpy_cuda as ngl
 import numpy as np
-import time
 
 from .utils import f32, i32
 from .SKLSearchIndex import SKLSearchIndex
@@ -70,6 +69,7 @@ class Graph(object):
             self.nn_index = index
         self.nn_index.fit(self.X)
 
+        available_gpu_memory = ngl.get_available_device_memory()
         if query_size is None:
             # Because we are using f32 and i32:
             bytes_per_number = 4
@@ -79,28 +79,38 @@ class Graph(object):
             # Worst-case upper bound limit of the number of points
             # needed in a single query
             if self.relaxed:
-                # If we are requesting a relaxed graph, then we don't
-                # need neighbors' neighbors
+                # For the relaxed algorithm we need n*D storage for the
+                # point locations plus n*k for the representation of the
+                # input edges plus another n*k for the output edges
+                # We could potentially only need one set of edges for
+                # this version
                 worst_case = D + 2*k
             else:
+                # For the strict algorithm, if we are processing n
+                # points at a time, we need the point locations of all
+                # of their neigbhors, thus in the worst case, we need
+                # n + n*k point locations and rows of the edge matrix.
+                # the 2*k again represents the need for two versions of
+                # the edge matrix. Here, we definitely need an input and
+                # an output array
                 worst_case = (D + 2*k) * (k + 1)
 
             # If we are using the discrete algorithm, remember we need
             # to add the template's storage as well to the GPU
             if discrete_steps > 0:
-                worst_case += discrete_steps
+                available_gpu_memory -= discrete_steps*bytes_per_number
 
             divisor = bytes_per_number * worst_case
 
-            query_size = min(ngl.get_available_device_memory() // divisor, N)
+            query_size = min(available_gpu_memory // divisor, N)
 
         self.query_size = int(query_size)
 
-        print('Problem Size: {}'.format(N))
-        print('  Query Size: {}'.format(self.query_size))
-        print('  GPU Memory: {}'.format(ngl.get_available_device_memory()))
         self.chunked = self.X.shape[0] > self.query_size
-        print('     Chunked: {}'.format(self.chunked))
+        # print('Problem Size: {}'.format(N))
+        # print('  Query Size: {}'.format(self.query_size))
+        # print('  GPU Memory: {}'.format(available_gpu_memory))
+        # print('     Chunked: {}'.format(self.chunked))
 
         self.edge_list = Queue(self.query_size*10)
         self.done = False
@@ -111,114 +121,79 @@ class Graph(object):
         end_index = min(start_index+self.query_size, self.X.shape[0])
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
-        # print('Working Set: {}'.format(str(working_set)))
-        start = time.process_time()
-        distances, edge_matrix = self.nn_index.search(working_set,
-                                                      self.max_neighbors)
-        end = time.process_time()
-        print('\tskl query: {} s'.format(end-start))
+
+        distances, edges = self.nn_index.search(working_set,
+                                                self.max_neighbors)
 
         indices = working_set
         # We will need the locations of these additional points since
         # we need to know if they fall into the empty region of any
         # edges above
-        additional_indices = np.setdiff1d(edge_matrix.ravel(),
+        additional_indices = np.setdiff1d(edges.ravel(),
                                           working_set)
 
-        # print('Additional indices needed: {}'.format(str(additional_indices)))
-
         if additional_indices.shape[0] > 0:
-            # It is possible that we cannot store the entirety of X on
-            # the GPU, so figure out the subset of Xs and carefully
-            # replace the edge_matrix values
+            # It is possible that we cannot store the entirety of X
+            # and edges on the GPU, so figure out the subset of Xs and
+            # carefully replace the edges values
             indices = np.hstack((working_set, additional_indices))
             if not self.relaxed:
-                start = time.process_time()
-                neighbor_matrix = self.nn_index.search(additional_indices,
-                                                       self.max_neighbors,
-                                                       False)
-                end = time.process_time()
-                print('\tsecondary skl query: {} s'.format(end-start))
+                neighbor_edges = self.nn_index.search(additional_indices,
+                                                      self.max_neighbors,
+                                                      False)
 
                 # We don't care about whether any of the edges of these
                 # extra rows are valid yet, but the algorithm will need
                 # them to prune correctly
-                edge_matrix = np.vstack((edge_matrix, neighbor_matrix))
+                edges = np.vstack((edges, neighbor_edges))
 
                 # Since we will be using the edges above for queries, we
                 # need to make sure we have the locations of everything
                 # they touch
-                neighbor_indices = np.setdiff1d(neighbor_matrix.ravel(),
+                neighbor_indices = np.setdiff1d(neighbor_edges.ravel(),
                                                 indices)
-                # print('Additional neighboring indices needed: {}'.format(str(neighbor_indices)))
+
                 if neighbor_indices.shape[0] > 0:
                     indices = np.hstack((indices, neighbor_indices))
 
         indices = indices.astype(i32)
         X = self.X[indices, :]
-        start = time.process_time()
-        edge_matrix = ngl.prune(X,
-                                edge_matrix,
-                                indices=indices,
-                                relaxed=self.relaxed,
-                                steps=self.discrete_steps,
-                                beta=self.beta,
-                                lp=self.p,
-                                count=count)
-        end = time.process_time()
-        print('\tGPU time: {} s'.format(end-start))
+        edges = ngl.prune(X,
+                          edges,
+                          indices=indices,
+                          relaxed=self.relaxed,
+                          steps=self.discrete_steps,
+                          beta=self.beta,
+                          lp=self.p,
+                          count=count)
 
-
-        #print(edge_matrix)
-        #start = time.process_time()
-        #for i, row in enumerate(edge_matrix):
-        #    p_index = start_index+i
-        #    for j, q_index in enumerate(row):
-        #        if q_index != -1:
-        #            self.edge_list.put((p_index, q_index, distances[i, j]))
-        #end = time.process_time()
-        start = time.process_time()
-        valid_edges = ngl.get_edge_list(edge_matrix, distances)
+        valid_edges = ngl.get_edge_list(edges, distances)
         for edge in valid_edges:
             self.edge_list.put(edge)
-        end = time.process_time()
-        print('\tList time: {} s'.format(end-start))
 
     def populate_whole(self):
         count = self.X.shape[0]
         working_set = np.array(range(count))
-        distances, edge_matrix = self.nn_index.search(working_set,
-                                                      self.max_neighbors)
+        distances, edges = self.nn_index.search(working_set,
+                                                self.max_neighbors)
 
-        edge_matrix = ngl.prune(self.X, edge_matrix,
-                                relaxed=self.relaxed,
-                                steps=self.discrete_steps,
-                                beta=self.beta,
-                                lp=self.p)
+        edges = ngl.prune(self.X,
+                          edges,
+                          relaxed=self.relaxed,
+                          steps=self.discrete_steps,
+                          beta=self.beta,
+                          lp=self.p)
 
-        # for i, row in enumerate(edge_matrix):
-        #     p_index = i
-        #     for j, q_index in enumerate(row):
-        #         if q_index != -1:
-        #             self.edge_list.put(
-        #                 (p_index, q_index, distances[i, j]))
-        start = time.process_time()
-        valid_edges = ngl.get_edge_list(edge_matrix, distances)
+        valid_edges = ngl.get_edge_list(edges, distances)
         for edge in valid_edges:
             self.edge_list.put(edge)
-        end = time.process_time()
-        # print('\tList time: {} s'.format(end-start))
-
 
     def populate(self):
         try:
             if self.chunked:
                 start_index = 0
                 while start_index < self.X.shape[0]:
-                    start = time.process_time()
                     self.populate_chunk(start_index)
-                    end = time.process_time()
-                    print('populate chunk {} s'.format(end-start))
                     start_index += self.query_size
             else:
                 self.populate_whole()

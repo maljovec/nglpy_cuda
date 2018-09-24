@@ -157,5 +157,3 @@ PyMODINIT_FUNC PyInit_core(){
     import_array();
     return PyModule_Create(&module_def);
 }
-
-

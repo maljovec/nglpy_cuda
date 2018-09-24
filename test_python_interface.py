@@ -15,7 +15,7 @@ np.random.seed(seed)
 X = np.random.uniform(size=(N, D))
 X = np.array(X, dtype=np.float32)
 search_indices = {}
-#search_indices['FAISS'] = ngl.FAISSSearchIndex()
+# search_indices['FAISS'] = ngl.FAISSSearchIndex()
 search_indices['SKL'] = ngl.SKLSearchIndex()
 for name, index in search_indices.items():
     start = time.process_time()
