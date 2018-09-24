@@ -9,6 +9,7 @@ from setuptools import setup
 # Code from https://github.com/rmcgibbo/npcuda-example to build a custom
 # CUDA module via distutils
 import os
+import re
 from os.path import join as pjoin
 from distutils.extension import Extension
 from distutils.command.build_ext import build_ext
