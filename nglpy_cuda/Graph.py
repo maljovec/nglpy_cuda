@@ -116,7 +116,7 @@ class Graph(object):
         distances, edge_matrix = self.nn_index.search(working_set,
                                                       self.max_neighbors)
         end = time.process_time()
-        print('\tskl query: {} '.format(end-start))
+        print('\tskl query: {} s'.format(end-start))
 
         indices = working_set
         # We will need the locations of these additional points since
@@ -154,28 +154,29 @@ class Graph(object):
                 if neighbor_indices.shape[0] > 0:
                     indices = np.hstack((indices, neighbor_indices))
 
+        indices = indices.astype(i32)
         X = self.X[indices, :]
         start = time.process_time()
-        if self.discrete_steps > 0:
-            edge_matrix = ngl.prune_discrete(X,
-                                             edge_matrix,
-                                             indices=indices,
-                                             relaxed=self.relaxed,
-                                             steps=self.discrete_steps,
-                                             beta=self.beta,
-                                             lp=self.p,
-                                             count=count)
-        else:
-            edge_matrix = ngl.prune(X,
-                                    edge_matrix,
-                                    indices=indices,
-                                    relaxed=self.relaxed,
-                                    beta=self.beta,
-                                    lp=self.p,
-                                    count=count)
+        edge_matrix = ngl.prune(X,
+                                edge_matrix,
+                                indices=indices,
+                                relaxed=self.relaxed,
+                                steps=self.discrete_steps,
+                                beta=self.beta,
+                                lp=self.p,
+                                count=count)
         end = time.process_time()
-        print('GPU time: {} s'.format(end-start))
+        print('\tGPU time: {} s'.format(end-start))
 
+
+        #print(edge_matrix)
+        #start = time.process_time()
+        #for i, row in enumerate(edge_matrix):
+        #    p_index = start_index+i
+        #    for j, q_index in enumerate(row):
+        #        if q_index != -1:
+        #            self.edge_list.put((p_index, q_index, distances[i, j]))
+        #end = time.process_time()
         start = time.process_time()
         valid_edges = ngl.get_edge_list(edge_matrix, distances)
         for edge in valid_edges:
@@ -188,23 +189,26 @@ class Graph(object):
         working_set = np.array(range(count))
         distances, edge_matrix = self.nn_index.search(working_set,
                                                       self.max_neighbors)
-        if self.discrete_steps > 0:
-            edge_matrix = ngl.prune_discrete(self.X, edge_matrix,
-                                             relaxed=self.relaxed,
-                                             steps=self.discrete_steps,
-                                             beta=self.beta, lp=self.p)
-        else:
-            edge_matrix = ngl.prune(self.X, edge_matrix,
-                                    relaxed=self.relaxed,
-                                    beta=self.beta,
-                                    lp=self.p)
 
-        for i, row in enumerate(edge_matrix):
-            p_index = i
-            for j, q_index in enumerate(row):
-                if q_index != -1:
-                    self.edge_list.put(
-                        (p_index, q_index, distances[i, j]))
+        edge_matrix = ngl.prune(self.X, edge_matrix,
+                                relaxed=self.relaxed,
+                                steps=self.discrete_steps,
+                                beta=self.beta,
+                                lp=self.p)
+
+        # for i, row in enumerate(edge_matrix):
+        #     p_index = i
+        #     for j, q_index in enumerate(row):
+        #         if q_index != -1:
+        #             self.edge_list.put(
+        #                 (p_index, q_index, distances[i, j]))
+        start = time.process_time()
+        valid_edges = ngl.get_edge_list(edge_matrix, distances)
+        for edge in valid_edges:
+            self.edge_list.put(edge)
+        end = time.process_time()
+        # print('\tList time: {} s'.format(end-start))
+
 
     def populate(self):
         try:

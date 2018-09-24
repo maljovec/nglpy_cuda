@@ -7,9 +7,9 @@ import time
 ########################################################################
 # Example using the Graph class as an iterator
 seed = 0
-N = 500000
-D = 2
-K = 100
+N = 10000000
+D = 5
+K = 300
 
 np.random.seed(seed)
 X = np.random.uniform(size=(N, D))
@@ -19,20 +19,26 @@ search_indices = {}
 search_indices['SKL'] = ngl.SKLSearchIndex()
 for name, index in search_indices.items():
     start = time.process_time()
-    graph = ngl.Graph(X, index=index, max_neighbors=K, relaxed=True, query_size=100000)
+    graph = ngl.Graph(X, index=index, max_neighbors=K, relaxed=True)
     count = 0
     for edge in graph:
         count += 1
     end = time.process_time()
     print('')
-    print('{} Index: {} s ({} edges)'.format(name, end-start, count))
+print('{} Index: {} s ({} edges)'.format(name, end-start, count))
 sys.exit(0)
 ########################################################################
 print('~'*80)
 np.random.seed(2)
 X = np.random.uniform(size=(10, 2))
 
-graph = ngl.Graph(X, max_neighbors=5, relaxed=False, query_size=2)
+graph = ngl.Graph(X, max_neighbors=5, relaxed=True)
+
+for edge in graph:
+    print(edge)
+
+print('~'*80)
+graph = ngl.Graph(X, max_neighbors=5, relaxed=True, query_size=2)
 
 for edge in graph:
     print(edge)

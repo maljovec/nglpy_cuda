@@ -2,8 +2,7 @@
 #include <cstdio>
 #include <map>
 
-#include <iostream>
-#include <chrono>
+//#include <iostream>
 
 #define cudaErrchk(ans) { GPUAssert((ans), __FILE__, __LINE__); }
 inline void GPUAssert(cudaError_t code, const char *file, int line,
@@ -20,36 +19,6 @@ namespace nglcu {
     dim3 grid_size(4, 4);
     dim3 block_size_1D(1024);
     dim3 grid_size_1D(16);
-
-    __global__
-    void map_indices_d(int *matrix, bool *mask, int *map, int M, int N, int start_K, int end_K) {
-        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
-        int stride_x = blockDim.x * gridDim.x;
-
-        int index_y = blockIdx.y * blockDim.y + threadIdx.y;
-        int stride_y = blockDim.y * gridDim.y;
-
-        int row, col, i;
-        int temp;
-        for (row = index_y; row < M; row += stride_y) {
-            for (col = index_x; col < N; col += stride_x) {
-                temp = matrix[row*N+col];
-                if (temp == -1 || mask[row*N+col]) {
-                    continue;
-                }
-
-                i = start_K;
-                while ( i < end_K && map[i] != temp) {
-                    i++;
-                }
-                if (i < end_K) {
-                    temp = i;
-                    mask[row*N+col] = true;
-                }
-                matrix[row*N+col] = temp;
-            }
-        }
-    }
 
     __global__
     void unmap_indices_d(int *matrix, int *map, int M, int N) {
@@ -427,21 +396,6 @@ namespace nglcu {
         }
     }
 
-    void map_indices_cpu(int *matrix, int *map, int M, int N, int K) {
-        std::map<int, int> lookup;
-        int i, j;
-        for(i = 0; i < K; i++) {
-            lookup[map[i]] = i;
-        }
-        lookup[-1] = -1;
-
-        for(i = 0; i < M; i++) {
-            for(j = 0; j < N; j++) {
-                matrix[i*N+j] = lookup[matrix[i*N+j]];
-            }
-        }
-    }
-
     void map_indices(int *matrix_d, int *map_d, int M, int N) {
         unmap_indices_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
         cudaError_t err = cudaGetLastError();
@@ -526,8 +480,12 @@ namespace nglcu {
         if (indices != NULL) {
             int *map_d;
             int i;
+            int max_idx = 0;
+            for(i = 0; i < count; i++) {
+                max_idx = indices[i] > max_idx ? indices[i] : max_idx;
+            }
 
-            cudaMallocManaged(&map_d, N*sizeof(int));
+            cudaMallocManaged(&map_d, max_idx*sizeof(int));
             for(i = 0; i < count; i++) {
                 map_d[indices[i]] = i;
             }
@@ -593,15 +551,10 @@ namespace nglcu {
         int *edgesIn_d;
         int *edgesOut_d;
 
-        auto start = std::chrono::high_resolution_clock::now();
-        auto finish = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed;
-
         if (count < 0) {
             count = N;
         }
 
-        start = std::chrono::high_resolution_clock::now();
         cudaMallocManaged(&edgesIn_d, M*K*sizeof(int));
         memcpy(edgesIn_d, edges, M*K*sizeof(int));
 
@@ -613,25 +566,17 @@ namespace nglcu {
             int i;
 
             cudaMallocManaged(&map_d, N*sizeof(int));
-            for(i = 0; i < count; i++) {
+            for(i = 0; i < N; i++) {
                 map_d[indices[i]] = i;
             }
             map_indices(edgesIn_d, map_d, M, K);
             map_indices(edgesOut_d, map_d, M, K);
             cudaFree(map_d);
         }
-        finish = std::chrono::high_resolution_clock::now();
-        elapsed = finish - start;
-        std::cout << "Allocate and Map time: " << elapsed.count() << " s\n";
 
-        start = std::chrono::high_resolution_clock::now();
         cudaMallocManaged(&x_d, N*D*sizeof(float));
         memcpy(x_d, X, N*D*sizeof(float));
-        finish = std::chrono::high_resolution_clock::now();
-        elapsed = finish - start;
-        std::cout << "Malloc time: " << elapsed.count() << " s\n";
 
-        start = std::chrono::high_resolution_clock::now();
         if (relaxed) {
             prune_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, count, D, K, lp, beta, edgesOut_d);
         }
@@ -643,26 +588,16 @@ namespace nglcu {
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
-        finish = std::chrono::high_resolution_clock::now();
-        elapsed = finish - start;
-        std::cout << "Prune time: " << elapsed.count() << " s\n";
 
-        start = std::chrono::high_resolution_clock::now();
         if (indices != NULL) {
-            unmap_indices(edgesOut_d, indices, M, K, count);
+            unmap_indices(edgesOut_d, indices, count, K, N);
         }
-        finish = std::chrono::high_resolution_clock::now();
-        elapsed = finish - start;
-        std::cout << "Unmap time: " << elapsed.count() << " s\n";
 
-        start = std::chrono::high_resolution_clock::now();
         memcpy(edges, edgesOut_d, count*K*sizeof(int));
+
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
-        finish = std::chrono::high_resolution_clock::now();
-        elapsed = finish - start;
-        std::cout << "Finalize time: " << elapsed.count() << " s\n";
     }
 
     void print_cuda_info() {
