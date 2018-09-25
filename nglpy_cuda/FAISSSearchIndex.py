@@ -30,7 +30,7 @@ class FAISSSearchIndex(SearchIndex):
         self.X = X
         d = self.X.shape[1]
 
-        res = faiss.StandardGpuResources()
+        self.res = faiss.StandardGpuResources()
         ################################################################
         # Approximate search
 
@@ -53,11 +53,11 @@ class FAISSSearchIndex(SearchIndex):
         # self.index = faiss.index_cpu_to_gpu(res, 0, index, co)
         ################################################################
         # Exact search
-        flat_config = faiss.GpuIndexFlatConfig()
-        flat_config.device = 0
-        flat_config.useFloat16 = True
+        self.flat_config = faiss.GpuIndexFlatConfig()
+        self.flat_config.device = 0
+        self.flat_config.useFloat16 = True
 
-        self.index = faiss.GpuIndexFlatL2(res, d, flat_config)
+        self.index = faiss.GpuIndexFlatL2(self.res, d, self.flat_config)
         ################################################################
 
         self.index.nprobe = 1  # 256
@@ -78,9 +78,9 @@ class FAISSSearchIndex(SearchIndex):
 
             A numpy array specifying the distances to each neighbor
         """
-        distance_matrix, edge_matrix = self.index.search(self.X[idx, :], k)
+        test_X = np.atleast_2d(self.X[idx, :])
+        distance_matrix, edge_matrix = self.index.search(test_X, k)
         edge_matrix = np.array(edge_matrix, dtype=i32)
-
         if return_distance:
             distance_matrix = np.array(distance_matrix, dtype=f32)
             return distance_matrix, edge_matrix

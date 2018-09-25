@@ -177,17 +177,17 @@ int main(int argc, char **argv)
   if(discrete) {
       std::cerr << "\tDiscrete Graph requested" << std::endl;
       nglcu::create_template(referenceShape, beta, lp, steps);
-      nglcu::prune_discrete(x, edgesOut, N, D, K, referenceShape, steps, relaxed);
+      nglcu::prune_discrete(x, edgesOut, NULL, N, D, N, K, referenceShape, steps, relaxed);
       t2 = now();
       std::cerr << "GPU execution with template " << t2-t1 << " s" << std::endl;
       t1 = now();
-      nglcu::prune_discrete(x, edgesOut, N, D, K, NULL, steps, relaxed, beta, lp);
+      nglcu::prune_discrete(x, edgesOut, NULL, N, D, N, K, NULL, steps, relaxed, beta, lp);
       t2 = now();
       std::cerr << "GPU execution without template " << t2-t1 << " s" << std::endl;
       t1 = now();
   }
   else {
-      nglcu::prune(x, edgesOut, N, D, K, relaxed, beta, lp);
+      nglcu::prune(x, edgesOut, NULL, N, D, N, K, relaxed, beta, lp);
 
       t2 = now();
       std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;

@@ -1,8 +1,6 @@
 #include "ngl_cuda.cuh"
 #include <cstdio>
-#include <vector>
 #include <map>
-#include <algorithm>
 
 #define cudaErrchk(ans) { GPUAssert((ans), __FILE__, __LINE__); }
 inline void GPUAssert(cudaError_t code, const char *file, int line,
@@ -19,6 +17,24 @@ namespace nglcu {
     dim3 grid_size(4, 4);
     dim3 block_size_1D(1024);
     dim3 grid_size_1D(16);
+
+    __global__
+    void unmap_indices_d(int *matrix, int *map, int M, int N) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+        int stride_y = blockDim.y * gridDim.y;
+
+        int row, col;
+        for (row = index_y; row < M; row += stride_y) {
+            for (col = index_x; col < N; col += stride_x) {
+                if(matrix[row*N+col] != -1) {
+                    matrix[row*N+col] = map[matrix[row*N+col]];
+                }
+            }
+        }
+    }
 
     __global__
     void prune_discrete_d(float *X, int *edgesIn, const int N, const int D,
@@ -377,6 +393,29 @@ namespace nglcu {
         }
     }
 
+    void map_indices(int *matrix_d, int *map_d, int M, int N) {
+        unmap_indices_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+            printf("Error: %s\n", cudaGetErrorString(err));
+        cudaDeviceSynchronize();
+    }
+
+    void unmap_indices(int *matrix_d, int *map, int M, int N, int K) {
+        int *map_d;
+
+        cudaMallocManaged(&map_d, K*sizeof(int));
+        memcpy(map_d, map, K*sizeof(int));
+
+        unmap_indices_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
+
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+            printf("Error: %s\n", cudaGetErrorString(err));
+        cudaDeviceSynchronize();
+        cudaFree(map_d);
+    }
+
     float min_distance_from_edge(float t, float beta, float p) {
         float xC = 0;
         float yC = 0;
@@ -417,22 +456,46 @@ namespace nglcu {
         }
     }
 
-    void prune_discrete(float *X, int *edges, const int N, const int D,
-                        const int K, float *erTemplate, const int steps,
-                        const bool relaxed, const float beta, const float p) {
+    void prune_discrete(float *X, int *edges, int *indices, int N, int D, int M, int K,
+                        float *erTemplate, int steps, bool relaxed, float beta,
+                        float p, int count) {
         float *x_d;
         int *edgesIn_d;
         int *edgesOut_d;
         float *erTemplate_d;
+
+        if (count < 0) {
+            count = N;
+        }
+
+        cudaErrchk(cudaMallocManaged(&edgesIn_d, M*K*sizeof(int)));
+        memcpy(edgesIn_d, edges, M*K*sizeof(int));
+
+        cudaErrchk(cudaMallocManaged(&edgesOut_d, count*K*sizeof(int)));
+        memcpy(edgesOut_d, edges, count*K*sizeof(int));
+
+        if (indices != NULL) {
+            int *map_d;
+            int i;
+            int max_idx = 0;
+            for(i = 0; i < count; i++) {
+                max_idx = indices[i] > max_idx ? indices[i] : max_idx;
+            }
+
+            cudaMallocManaged(&map_d, max_idx*sizeof(int));
+            for(i = 0; i < count; i++) {
+                map_d[indices[i]] = i;
+            }
+            map_indices(edgesIn_d, map_d, M, K);
+            map_indices(edgesOut_d, map_d, M, K);
+            cudaFree(map_d);
+        }
+
         cudaErrchk(cudaMallocManaged(&x_d, N*D*sizeof(float)));
-        cudaErrchk(cudaMallocManaged(&edgesIn_d, N*K*sizeof(int)));
-        cudaErrchk(cudaMallocManaged(&edgesOut_d, N*K*sizeof(int)));
-        cudaErrchk(cudaMallocManaged(&erTemplate_d, (steps)*sizeof(float)));
-
         memcpy(x_d, X, N*D*sizeof(float));
-        memcpy(edgesIn_d, edges, N*K*sizeof(float));
-        memcpy(edgesOut_d, edges, N*K*sizeof(float));
 
+
+        cudaErrchk(cudaMallocManaged(&erTemplate_d, steps*sizeof(float)));
         if (erTemplate != NULL) {
             memcpy(erTemplate_d, erTemplate, (steps)*sizeof(float));
         }
@@ -445,7 +508,7 @@ namespace nglcu {
         if (relaxed) {
             prune_discrete_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d,
                                                                       edgesIn_d,
-                                                                      N,
+                                                                      count,
                                                                       D,
                                                                       K,
                                                                       erTemplate_d,
@@ -455,7 +518,7 @@ namespace nglcu {
         else {
             prune_discrete_d<<<grid_size, block_size>>>(x_d,
                                                         edgesIn_d,
-                                                        N,
+                                                        count,
                                                         D,
                                                         K,
                                                         erTemplate_d,
@@ -467,7 +530,11 @@ namespace nglcu {
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
 
-        memcpy(edges, edgesOut_d, N*K*sizeof(float));
+        if (indices != NULL) {
+            unmap_indices(edgesOut_d, indices, M, K, count);
+        }
+
+        memcpy(edges, edgesOut_d, count*K*sizeof(int));
 
         cudaFree(x_d);
         cudaFree(edgesIn_d);
@@ -475,24 +542,43 @@ namespace nglcu {
         cudaFree(erTemplate_d);
     }
 
-    void prune(float *X, int *edges, const int N, const int D, const int K,
-               bool relaxed, float beta, float lp) {
+    void prune(float *X, int *edges, int *indices, int N, int D, int M, int K,
+               bool relaxed, float beta, float lp, int count) {
         float *x_d;
         int *edgesIn_d;
         int *edgesOut_d;
-        cudaMallocManaged(&x_d, N*D*sizeof(float));
-        cudaMallocManaged(&edgesIn_d, N*K*sizeof(int));
-        cudaMallocManaged(&edgesOut_d, N*K*sizeof(int));
 
+        if (count < 0) {
+            count = N;
+        }
+
+        cudaMallocManaged(&edgesIn_d, M*K*sizeof(int));
+        memcpy(edgesIn_d, edges, M*K*sizeof(int));
+
+        cudaMallocManaged(&edgesOut_d, count*K*sizeof(int));
+        memcpy(edgesOut_d, edges, count*K*sizeof(int));
+
+        if (indices != NULL) {
+            int *map_d;
+            int i;
+
+            cudaMallocManaged(&map_d, N*sizeof(int));
+            for(i = 0; i < N; i++) {
+                map_d[indices[i]] = i;
+            }
+            map_indices(edgesIn_d, map_d, M, K);
+            map_indices(edgesOut_d, map_d, count, K);
+            cudaFree(map_d);
+        }
+
+        cudaMallocManaged(&x_d, N*D*sizeof(float));
         memcpy(x_d, X, N*D*sizeof(float));
-        memcpy(edgesIn_d, edges, N*K*sizeof(float));
-        memcpy(edgesOut_d, edges, N*K*sizeof(float));
 
         if (relaxed) {
-            prune_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, N, D, K, lp, beta, edgesOut_d);
+            prune_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, count, D, K, lp, beta, edgesOut_d);
         }
         else {
-            prune_d<<<grid_size, block_size>>>(x_d, edgesIn_d, N, D, K, lp, beta, edgesOut_d);
+            prune_d<<<grid_size, block_size>>>(x_d, edgesIn_d, count, D, K, lp, beta, edgesOut_d);
         }
 
         cudaError_t err = cudaGetLastError();
@@ -500,24 +586,15 @@ namespace nglcu {
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
 
-        memcpy(edges, edgesOut_d, N*K*sizeof(float));
+        if (indices != NULL) {
+            unmap_indices(edgesOut_d, indices, count, K, N);
+        }
+
+        memcpy(edges, edgesOut_d, count*K*sizeof(int));
 
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
-    }
-
-    vector_edge get_edge_list(int *edges, const int N, const int K) {
-        int i, k;
-        vector_edge edge_list;
-        for(i = 0; i < N; i++) {
-            for(k = 0; k < K; k++) {
-                if (edges[i*K+k] != -1) {
-                    edge_list.push_back(std::make_pair(i, edges[i*K+k]));
-                }
-            }
-        }
-        return edge_list;
     }
 
     void print_cuda_info() {
@@ -527,5 +604,13 @@ namespace nglcu {
         fprintf(stderr, "max threads per processor: %d\n", properties.maxThreadsPerMultiProcessor);
         fprintf(stderr, "Grid Size: %dx%d\n", grid_size.x, grid_size.y);
         fprintf(stderr, "Block Size: %dx%d\n", block_size.x, block_size.y);
+    }
+
+    size_t get_available_device_memory() {
+        size_t free_memory;
+        size_t total_memory;
+        cudaErrchk(cudaMemGetInfo(&free_memory, &total_memory));
+
+        return free_memory;
     }
 }

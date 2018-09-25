@@ -80,7 +80,7 @@ class TestAPI(unittest.TestCase):
         Testing prune_discrete function with beta/lp specified.
         """
         self.setup()
-        ngl_edges = ngl.prune_discrete(self.X, self.edges)
+        ngl_edges = ngl.prune(self.X, self.edges, steps=100)
         edge_set = create_edge_set(ngl_edges)
         self.assertEqual(len(self.gold_strict ^ edge_set), 0, '')
 
@@ -90,7 +90,7 @@ class TestAPI(unittest.TestCase):
         """
         self.setup()
         template = np.array(ngl.create_template(1, 2, 100), dtype=f32)
-        ngl_edges = ngl.prune_discrete(self.X, self.edges, template)
+        ngl_edges = ngl.prune(self.X, self.edges, template=template)
         edge_set = create_edge_set(ngl_edges)
         self.assertEqual(len(self.gold_strict ^ edge_set), 0, '')
 
@@ -100,11 +100,11 @@ class TestAPI(unittest.TestCase):
         """
         self.setup()
         ngl_edges = ngl.prune(self.X, self.edges)
-        edge_list = ngl.get_edge_list(10, 10, ngl_edges)
+        edge_list = ngl.get_edge_list(ngl_edges, np.zeros(ngl_edges.shape))
         edge_set = set()
-        for item in edge_list:
-            lo = min(item)
-            hi = max(item)
+        for (p, q, d) in edge_list:
+            lo = min(p, q)
+            hi = max(p, q)
             edge_set.add((lo, hi))
         self.assertEqual(len(self.gold_strict ^ edge_set), 0, '')
 
@@ -115,18 +115,30 @@ class TestAPI(unittest.TestCase):
     #     # correctly by doing some memory debugging with objgraph
     #     _ = objgraph.growth(limit=None)
     #     current = objgraph.growth(limit=None)
+    #     print(ngl.get_available_device_memory())
+    #     print(current)
     #     self.test_min_distance_from_edge()
-    #     self.assertEqual(current, objgraph.growth(limit=None),
-    #                      'There should be no memory changes.')
+    #     print(ngl.get_available_device_memory())
+    #     print(objgraph.growth(limit=None))
+    #     # self.assertEqual(current, objgraph.growth(limit=None),
+    #     #                  'There should be no memory changes.')
     #     self.test_create_template()
-    #     self.assertEqual(current, objgraph.growth(limit=None),
-    #                      'There should be no memory changes.')
+    #     print(ngl.get_available_device_memory())
+    #     print(objgraph.growth(limit=None))
+    #     # self.assertEqual(current, objgraph.growth(limit=None),
+    #     #                  'There should be no memory changes.')
     #     self.test_prune()
-    #     self.assertEqual(current, objgraph.growth(limit=None),
-    #                      'There should be no memory changes.')
+    #     print(ngl.get_available_device_memory())
+    #     print(objgraph.growth(limit=None))
+    #     # self.assertEqual(current, objgraph.growth(limit=None),
+    #     #                  'There should be no memory changes.')
     #     self.test_prune_discrete()
-    #     self.assertEqual(current, objgraph.growth(limit=None),
-    #                      'There should be no memory changes.')
+    #     print(ngl.get_available_device_memory())
+    #     print(objgraph.growth(limit=None))
+    #     # self.assertEqual(current, objgraph.growth(limit=None),
+    #     #                  'There should be no memory changes.')
     #     self.test_get_edge_list()
-    #     self.assertEqual(current, objgraph.growth(limit=None),
-    #                      'There should be no memory changes.')
+    #     print(ngl.get_available_device_memory())
+    #     print(objgraph.growth(limit=None))
+    #     # self.assertEqual(current, objgraph.growth(limit=None),
+    #     #                  'There should be no memory changes.')
