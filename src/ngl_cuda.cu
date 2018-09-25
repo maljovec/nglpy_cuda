@@ -892,19 +892,6 @@ namespace nglcu {
         cudaFree(probabilities_d);
     }
 
-    vector_edge get_edge_list(int *edges, int N, int K) {
-        int i, k;
-        vector_edge edge_list;
-        for(i = 0; i < N; i++) {
-            for(k = 0; k < K; k++) {
-                if (edges[i*K+k] != -1) {
-                    edge_list.push_back(std::make_pair(i, edges[i*K+k]));
-                }
-            }
-        }
-        return edge_list;
-    }
-
     void print_cuda_info() {
         struct cudaDeviceProp properties;
         cudaGetDeviceProperties(&properties, 0);
