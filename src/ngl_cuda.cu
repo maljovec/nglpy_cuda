@@ -860,15 +860,15 @@ namespace nglcu {
         memcpy(x_d, X, N*D*sizeof(float));
 
         if (relaxed) {
-            // probability_relaxed_d<<<grid_size, block_size>>>(x_d,
-            //                                                  edgesIn_d,
-            //                                                  count,
-            //                                                  D,
-            //                                                  K,
-            //                                                  lp,
-            //                                                  beta,
-            //                                                  steepness,
-            //                                                  probabilities_d);
+            probability_relaxed_d<<<grid_size, block_size>>>(x_d,
+                                                             edgesIn_d,
+                                                             count,
+                                                             D,
+                                                             K,
+                                                             lp,
+                                                             beta,
+                                                             steepness,
+                                                             probabilities_d);
         }
         else {
             probability_d<<<grid_size, block_size>>>(x_d,
