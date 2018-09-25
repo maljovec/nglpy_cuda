@@ -2,6 +2,7 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include "numpy/arrayobject.h"
 #include "ngl_cuda.h"
+#include <iostream>
 
 static PyObject* nglpy_cuda_core_get_edge_list(PyObject *self, PyObject *args) {
     int N;
@@ -184,6 +185,40 @@ static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args, PyO
     probability_arr = (PyArrayObject *)PyArray_ZEROS(2, idx, NPY_CFLOAT, 0);
     idx[0] = idx[1] = 0;
     float *probabilities = (float *)PyArray_GetPtr(probability_arr, idx);
+
+    std::cout << "        N=" << N << std::endl;
+    std::cout << "        D=" << D << std::endl;
+    std::cout << "        M=" << M << std::endl;
+    std::cout << "        K=" << K << std::endl;
+    std::cout << "Steepness=" << steepness << std::endl;
+    std::cout << "  relaxed=" << relaxed << std::endl;
+    std::cout << "     beta=" << beta << std::endl;
+    std::cout << "       lp=" << lp << std::endl;
+    std::cout << "    count=" << count << std::endl;
+
+    std::cout << "        X=" << std::endl;
+    for(int i= 0; i < N; i++) {
+        for(int j=0; j < D; j++) {
+            std::cout << X[i*D+j] << " ";
+        }
+        std::cout << std::endl << "         ";
+    }
+    std::cout << "    edges=" << std::endl;
+    for(int i= 0; i < M; i++) {
+        for(int j=0; j < K; j++) {
+            std::cout << edges[i*K+j] << " ";
+        }
+        std::cout << std::endl << "         ";
+    }
+
+    std::cout << "    probs=" << std::endl;
+    for(int i= 0; i < count; i++) {
+        for(int j=0; j < K; j++) {
+            std::cout << probabilities[i*K+j] << " ";
+        }
+        std::cout << std::endl << "         ";
+    }
+
     nglcu::associate_probability(X, edges, probabilities, indices, N, D, M, K, steepness, relaxed, beta, lp, count);
     Py_DECREF(X_arr);
     //Py_DECREF(edges_arr);
