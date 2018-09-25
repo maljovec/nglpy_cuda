@@ -46,8 +46,8 @@ namespace nglcu {
     }
 
     __global__
-    void prune_discrete_d(float *X, int *edgesIn, const int N, const int D,
-                        const int K, float *erTemplate, const int steps,
+    void prune_discrete_d(float *X, int *edgesIn, int N, int D,
+                        int K, float *erTemplate, int steps,
                         int *edgesOut) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
@@ -129,9 +129,9 @@ namespace nglcu {
     }
 
     __global__
-    void prune_discrete_relaxed_d(float *X, int *edgesIn, const int N,
-                                  const int D, const int K, float *erTemplate,
-                                  const int steps, int *edgesOut) {
+    void prune_discrete_relaxed_d(float *X, int *edgesIn, int N,
+                                  int D, int K, float *erTemplate,
+                                  int steps, int *edgesOut) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
 
@@ -213,7 +213,7 @@ namespace nglcu {
     }
 
     __global__
-    void prune_d(float *X, int *edgesIn, const int N, const int D, const int K,
+    void prune_d(float *X, int *edgesIn, int N, int D, int K,
                 float lp, float beta, int *edgesOut) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
@@ -305,8 +305,8 @@ namespace nglcu {
     }
 
     __global__
-    void prune_relaxed_d(float *X, int *edgesIn, const int N, const int D,
-                         const int K, float lp, float beta, int *edgesOut) {
+    void prune_relaxed_d(float *X, int *edgesIn, int N, int D,
+                         int K, float lp, float beta, int *edgesOut) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
 
@@ -405,9 +405,9 @@ namespace nglcu {
     __global__
     void probability_d(float *X,
                        int *edgesIn,
-                       const int N,
-                       const int D,
-                       const int K,
+                       int N,
+                       int D,
+                       int K,
                        float lp,
                        float beta,
                        float steepness,
@@ -480,6 +480,111 @@ namespace nglcu {
                         ////////////////////////////////////////////////
                         // ported from python function, can possibly be
                         // improved in terms of performance
+                        xC = 0;
+                        yC = 0;
+
+                        if (beta <= 1) {
+                            radius = 1. / beta;
+                            yC = powf(powf(radius, lp) - 1, 1. / lp);
+                        }
+                        else {
+                            radius = beta;
+                            xC = 1. - beta;
+                        }
+                        t = fabs(2*t-1);
+                        y = powf(powf(radius, lp) - powf(t-xC, lp), 1. / lp) - yC;
+                        minimum_allowable_distance = 0.5*y*sqrt(length_squared);
+
+                        probability = logistic_function(sqrt(squared_distance_to_edge), minimum_allowable_distance, steepness);
+
+                        if(probability < probabilities[K*i+k]) {
+                            probabilities[K*i+k] = probability;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    __global__
+    void probability_relaxed_d(float *X,
+                               int *edgesIn,
+                               int N,
+                               int D,
+                               int K,
+                               float lp,
+                               float beta,
+                               float steepness,
+                               float *probabilities) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        // We should use a 1D structure for this since we need to guarantee
+        // that other points have already been processed
+        // int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+        // int stride_y = blockDim.y * gridDim.y;
+
+        float *p, *q, *r;
+
+        float pq[10] = {};
+        float pr[10] = {};
+
+        int i, j, k, k2, d, n;
+        float t;
+
+        float length_squared;
+        float squared_distance_to_edge;
+        float minimum_allowable_distance;
+
+        ////////////////////////////////////////////////////////////
+        float xC, yC, radius, y;
+        ////////////////////////////////////////////////////////////
+
+        for (i = index_x; i < N; i += stride_x) {
+            for (k = 0; k < K; k++) {
+                p = &(X[D*i]);
+                j = edgesIn[K*i+k];
+                q = &(X[D*j]);
+
+                length_squared = 0;
+                for(d = 0; d < D; d++) {
+                    pq[d] = p[d] - q[d];
+                    length_squared += pq[d]*pq[d];
+                }
+                // A point should not be connected to itself
+                if(length_squared == 0) {
+                    edgesOut[K*i+k] = -1;
+                    continue;
+                }
+
+                // This loop presumes that all nearer neighbors have
+                // already been processed
+                for(k2 = 0; k2 < k; k2++) {
+                    n = edgesOut[K*i+k2];
+                    if (n == -1){
+                        continue;
+                    }
+                    r = &(X[D*n]);
+
+                    // t is the parameterization of the projection of pr onto pq
+                    // In layman's terms, this is the length of the shadow pr casts onto pq
+                    t = 0;
+                    for(d = 0; d < D; d++) {
+                        pr[d] = p[d] - r[d];
+                        t += pr[d]*pq[d];
+                    }
+
+                    t /= length_squared;
+
+                    if (t > 0 && t < 1) {
+                        squared_distance_to_edge = 0;
+                        for(d = 0; d < D; d++) {
+                            squared_distance_to_edge += (pr[d] - pq[d]*t)*(pr[d] - pq[d]*t);
+                        }
+
+                        ////////////////////////////////////////////////////////////
+                        // ported from python function, can possibly be improved
+                        // in terms of performance
                         xC = 0;
                         yC = 0;
 
@@ -787,7 +892,7 @@ namespace nglcu {
         cudaFree(probabilities_d);
     }
 
-    vector_edge get_edge_list(int *edges, const int N, const int K) {
+    vector_edge get_edge_list(int *edges, int N, int K) {
         int i, k;
         vector_edge edge_list;
         for(i = 0; i < N; i++) {
