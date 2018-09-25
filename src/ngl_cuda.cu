@@ -553,15 +553,15 @@ namespace nglcu {
                 }
                 // A point should not be connected to itself
                 if(length_squared == 0) {
-                    edgesOut[K*i+k] = -1;
+                    probabilities[K*i+k] = 0;
                     continue;
                 }
 
                 // This loop presumes that all nearer neighbors have
                 // already been processed
                 for(k2 = 0; k2 < k; k2++) {
-                    n = edgesOut[K*i+k2];
-                    if (n == -1){
+                    n = edgesIn[K*i+k2];
+                    if (n == -1 || probabilities[K*i+k2] < 1e-6 ){
                         continue;
                     }
                     r = &(X[D*n]);
