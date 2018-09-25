@@ -2,8 +2,6 @@
 #include <cstdio>
 #include <map>
 
-//#include <iostream>
-
 #define cudaErrchk(ans) { GPUAssert((ans), __FILE__, __LINE__); }
 inline void GPUAssert(cudaError_t code, const char *file, int line,
                       bool abort=true) {
@@ -27,7 +25,6 @@ namespace nglcu {
 
         int index_y = blockIdx.y * blockDim.y + threadIdx.y;
         int stride_y = blockDim.y * gridDim.y;
-
 
         int row, col;
         for (row = index_y; row < M; row += stride_y) {
@@ -570,7 +567,7 @@ namespace nglcu {
                 map_d[indices[i]] = i;
             }
             map_indices(edgesIn_d, map_d, M, K);
-            map_indices(edgesOut_d, map_d, M, K);
+            map_indices(edgesOut_d, map_d, count, K);
             cudaFree(map_d);
         }
 

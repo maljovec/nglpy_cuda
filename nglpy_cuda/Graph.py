@@ -167,7 +167,7 @@ class Graph(object):
                           lp=self.p,
                           count=count)
 
-        valid_edges = ngl.get_edge_list(edges, distances)
+        valid_edges = ngl.get_edge_list(edges[:count], distances[:count], indices)
         for edge in valid_edges:
             self.edge_list.put(edge)
 

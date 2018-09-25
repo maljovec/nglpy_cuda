@@ -9,13 +9,19 @@ static PyObject* nglpy_cuda_core_get_edge_list(PyObject *self, PyObject *args) {
 
     PyArrayObject *edges_arr;
     PyArrayObject *distances_arr;
-    if (!PyArg_ParseTuple(args, "O&O&", PyArray_Converter, &edges_arr, PyArray_Converter, &distances_arr))
+    PyArrayObject *indices_arr = NULL;
+    if (!PyArg_ParseTuple(args, "O&O&|O&", PyArray_Converter, &edges_arr, PyArray_Converter, &distances_arr, PyArray_Converter, &indices_arr))
         return NULL;
 
     npy_intp idx[2];
     idx[0] = idx[1] = 0;
     int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
     float *distances = (float *)PyArray_GetPtr(distances_arr, idx);
+    int *indices = NULL;
+
+    if (indices_arr != NULL ) {
+        indices = (int *)PyArray_GetPtr(indices_arr, idx);
+    }
 
     N = PyArray_DIM(edges_arr, 0);
     K = PyArray_DIM(edges_arr, 1);
@@ -35,11 +41,12 @@ static PyObject* nglpy_cuda_core_get_edge_list(PyObject *self, PyObject *args) {
     PyObject* edge_list = PyList_New(edge_count);
     edge_count = 0;
     for(i = 0; i < N; i++) {
+        int pi = indices != NULL ? indices[i] : i;
         for(k = 0; k < K; k++) {
             if (edges[i*K+k] != -1) {
-	        PyObject* item = Py_BuildValue("(iif)", i, edges[i*K+k], distances[i*K+k]);
+	            PyObject* item = Py_BuildValue("(iif)", pi, edges[i*K+k], distances[i*K+k]);
                 PyList_SetItem(edge_list, edge_count, item);
-	        edge_count++;
+	            edge_count++;
             }
         }
     }
