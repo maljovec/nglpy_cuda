@@ -113,9 +113,10 @@ class Graph(object):
         # print('     Chunked: {}'.format(self.chunked))
 
         self.edge_list = Queue(self.query_size*10)
-        self.done = False
+        self.needs_reset = False
 
-        Thread(target=self.populate, daemon=True).start()
+        self.worker_thread = Thread(target=self.populate, daemon=True)
+        self.worker_thread.start()
 
     def populate_chunk(self, start_index):
         end_index = min(start_index+self.query_size, self.X.shape[0])
@@ -189,20 +190,19 @@ class Graph(object):
             self.edge_list.put(edge)
 
     def populate(self):
-        try:
-            if self.chunked:
-                start_index = 0
-                while start_index < self.X.shape[0]:
-                    self.populate_chunk(start_index)
-                    start_index += self.query_size
-            else:
-                self.populate_whole()
-            self.done = True
-        except Exception as e:
-            # Signal the main thread that we won't be sending any more
-            # data before raising the exception
-            self.done = True
-            raise e
+        if self.chunked:
+            start_index = 0
+            while start_index < self.X.shape[0]:
+                self.populate_chunk(start_index)
+                start_index += self.query_size
+        else:
+            self.populate_whole()
+
+    def restart_iteration(self):
+        if not self.worker_thread.is_alive() and self.needs_reset:
+            self.edge_list.queue.clear()
+            self.needs_reset = False
+            self.worker_thread.start()
 
     def __iter__(self):
         return self
@@ -211,13 +211,13 @@ class Graph(object):
         return self.__next__()
 
     def __next__(self):
-        while not self.edge_list.empty() or not self.done:
+        if self.needs_reset:
+            self.restart_iteration()
+        while not self.edge_list.empty() or self.worker_thread.is_alive():
             try:
                 next_edge = self.edge_list.get(timeout=1)
                 return next_edge
             except Empty:
                 pass
-        if self.done:
-            self.done = False
-            Thread(target=self.populate, daemon=True).start()
+        self.needs_reset = True
         raise StopIteration
