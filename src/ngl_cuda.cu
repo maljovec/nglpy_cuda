@@ -534,6 +534,7 @@ namespace nglcu {
 
         float length_squared;
         float squared_distance_to_edge;
+        float probability;
         float minimum_allowable_distance;
 
         ////////////////////////////////////////////////////////////
