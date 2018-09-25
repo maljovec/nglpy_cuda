@@ -11,6 +11,7 @@ import numpy as np
 
 from .utils import f32, i32
 from .SKLSearchIndex import SKLSearchIndex
+from .Graph import Graph
 
 
 class ProbabilisticGraph(Graph):
@@ -57,7 +58,6 @@ class ProbabilisticGraph(Graph):
         """
         self.steepness = steepness
         self.seed = 0
-        np.random.seed(self.seed)
         super(ProbabilisticGraph, self).__init__(
             X,
             index=index,

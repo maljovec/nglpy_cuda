@@ -2,7 +2,6 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include "numpy/arrayobject.h"
 #include "ngl_cuda.h"
-#include <iostream>
 
 static PyObject* nglpy_cuda_core_get_edge_list(PyObject *self, PyObject *args) {
     int N;
@@ -100,7 +99,16 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args, PyObject*
     int steps = -1;
 
     static char* argnames[] = {"X", "edges", "indices", "template", "steps", "count", "relaxed", "beta", "lp", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|O&O&iipff", argnames, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr, PyArray_Converter, &indices_arr, PyArray_Converter, &template_arr, &steps, &count, &relaxed, &beta, &lp))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|O&O&iipff", argnames, 
+			             PyArray_Converter, &X_arr, 
+				     PyArray_Converter, &edges_arr, 
+				     PyArray_Converter, &indices_arr, 
+				     PyArray_Converter, &template_arr, 
+				     &steps, 
+				     &count, 
+				     &relaxed, 
+				     &beta, 
+				     &lp))
         return NULL;
 
     npy_intp idx[2];
@@ -159,7 +167,17 @@ static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args, PyO
     float steepness = 3;
 
     static char* argnames[] = {"X", "edges", "steepness", "indices", "template", "steps", "count", "relaxed", "beta", "lp", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O|&fO&O&iipff", argnames, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr, &steepness, PyArray_Converter, &indices_arr, PyArray_Converter, &template_arr, &steps, &count, &relaxed, &beta, &lp))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|fO&O&iipff", argnames,
+			             PyArray_Converter, &X_arr, 
+				     PyArray_Converter, &edges_arr, 
+				     &steepness, 
+				     PyArray_Converter, &indices_arr, 
+				     PyArray_Converter, &template_arr, 
+				     &steps, 
+				     &count, 
+				     &relaxed, 
+				     &beta, 
+				     &lp))
         return NULL;
 
     npy_intp idx[2];
@@ -180,46 +198,13 @@ static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args, PyO
     K = PyArray_DIM(edges_arr, 1);
 
     //Reuse this array since we already have it allocated
-    idx[0] = N;
+    idx[0] = count;
     idx[1] = K;
-    probability_arr = (PyArrayObject *)PyArray_ZEROS(2, idx, NPY_CFLOAT, 0);
+    probability_arr = (PyArrayObject *)PyArray_ZEROS(2, idx, NPY_FLOAT32, 0);
     idx[0] = idx[1] = 0;
     float *probabilities = (float *)PyArray_GetPtr(probability_arr, idx);
-
-    std::cout << "        N=" << N << std::endl;
-    std::cout << "        D=" << D << std::endl;
-    std::cout << "        M=" << M << std::endl;
-    std::cout << "        K=" << K << std::endl;
-    std::cout << "Steepness=" << steepness << std::endl;
-    std::cout << "  relaxed=" << relaxed << std::endl;
-    std::cout << "     beta=" << beta << std::endl;
-    std::cout << "       lp=" << lp << std::endl;
-    std::cout << "    count=" << count << std::endl;
-
-    std::cout << "        X=" << std::endl;
-    for(int i= 0; i < N; i++) {
-        for(int j=0; j < D; j++) {
-            std::cout << X[i*D+j] << " ";
-        }
-        std::cout << std::endl << "         ";
-    }
-    std::cout << "    edges=" << std::endl;
-    for(int i= 0; i < M; i++) {
-        for(int j=0; j < K; j++) {
-            std::cout << edges[i*K+j] << " ";
-        }
-        std::cout << std::endl << "         ";
-    }
-
-    std::cout << "    probs=" << std::endl;
-    for(int i= 0; i < count; i++) {
-        for(int j=0; j < K; j++) {
-            std::cout << probabilities[i*K+j] << " ";
-        }
-        std::cout << std::endl << "         ";
-    }
-
     nglcu::associate_probability(X, edges, probabilities, indices, N, D, M, K, steepness, relaxed, beta, lp, count);
+
     Py_DECREF(X_arr);
     //Py_DECREF(edges_arr);
 
