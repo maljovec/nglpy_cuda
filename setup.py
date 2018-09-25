@@ -5,26 +5,44 @@
 
 from setuptools import setup
 
+########################################################################
+# Code from https://github.com/rmcgibbo/npcuda-example to build a custom
+# CUDA module via distutils
+import os
+import re
+from os.path import join as pjoin
+from distutils.extension import Extension
+from distutils.command.build_ext import build_ext
+import numpy
+
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['numpy>=1.15']
+requirements = ['numpy', 'scipy', 'sklearn']
 
-###############################################################################
-# Code from https://github.com/rmcgibbo/npcuda-example to build a custom
-# CUDA module via distutils
-import os
-from os.path import join as pjoin
-from distutils.extension import Extension
-from distutils.command.build_ext import build_ext
+
+def get_property(prop, project):
+    """
+        Helper function for retrieving properties from a project's
+        __init__.py file
+        @In, prop, string representing the property to be retrieved
+        @In, project, string representing the project from which we will
+        retrieve the property
+        @Out, string, the value of the found property
+    """
+    result = re.search(
+        r'{}\s*=\s*[\'"]([^\'"]*)[\'"]'.format(prop),
+        open(project + "/__init__.py").read(),
+    )
+    return result.group(1)
 
 
 def find_in_path(name, path):
     "Find a file in a search path"
-    # adapted fom http://code.activestate.com/recipes/52224-find-a-file-given-a-search-path/
+    # adapted fom https://bit.ly/2QEHMUt
     for dir in path.split(os.pathsep):
         binpath = pjoin(dir, name)
         if os.path.exists(binpath):
@@ -51,7 +69,8 @@ def locate_cuda():
         nvcc = find_in_path('nvcc', os.environ['PATH'])
         if nvcc is None:
             raise EnvironmentError('The nvcc binary could not be '
-                                   'located in your $PATH. Either add it to your path, or set $CUDAHOME')
+                                   'located in your $PATH. Either add '
+                                   'it to your path, or set $CUDAHOME')
         home = os.path.dirname(os.path.dirname(nvcc))
 
     cudaconfig = {'home': home,
@@ -119,10 +138,8 @@ class custom_build_ext(build_ext):
         build_ext.build_extensions(self)
 
 
-###############################################################################
-import numpy
-
-setup_requirements = []
+VERSION = get_property("__version__", "nglpy_cuda")
+setup_requirements = ['numpy']
 test_requirements = []
 
 nglpy_cuda_core = Extension('nglpy_cuda.core',
@@ -159,11 +176,11 @@ setup(
     include_package_data=True,
     keywords='nglpy_cuda',
     name='nglpy_cuda',
-    # setup_requires=setup_requirements,
+    setup_requires=setup_requirements,
     test_suite='nglpy_cuda.tests',
     # tests_require=test_requirements,
     url='https://github.com/maljovec/nglpy_cuda',
-    version='0.1.0',
+    version=VERSION,
     zip_safe=False,
     ext_modules=[nglpy_cuda_core],
     cmdclass={'build_ext': custom_build_ext},
