@@ -138,7 +138,7 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args, PyObject*
     return PyArray_Return(edges_arr);
 }
 
-static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args) {
+static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args, PyObject* kwargs) {
     //import_array();
     int N;
     int D;

@@ -196,12 +196,11 @@ int main(int argc, char **argv)
 //       nglcu::prune(x, edgesOut, NULL, N, D, N, K, relaxed, beta, lp);
 //   }
 
-  nglcu::associate_probability(N, D, K, lp, beta, steepness, x, edgesOut, probabilities);
+  nglcu::associate_probability(x, edgesOut, probabilities, NULL, N, D, N, K, steepness, relaxed, beta, lp);
 
-      t2 = now();
-      std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;
-      t1 = now();
-  }
+  t2 = now();
+  std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;
+  t1 = now();
 
   for(i = 0; i < N; i++) {
     for(k = 0; k < K; k++) {
