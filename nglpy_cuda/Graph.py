@@ -217,4 +217,6 @@ class Graph(object):
                 return next_edge
             except Empty:
                 pass
+        if self.done:
+            Thread(target=self.populate, daemon=True).start()
         raise StopIteration
