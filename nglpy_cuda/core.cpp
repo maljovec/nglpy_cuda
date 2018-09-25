@@ -235,7 +235,7 @@ static PyMethodDef nglpy_cuda_core_methods[] = {
     {"create_template",(PyCFunction)nglpy_cuda_core_create_template, METH_VARARGS, ""},
     {"min_distance_from_edge",(PyCFunction)nglpy_cuda_core_min_distance_from_edge, METH_VARARGS, ""},
     {"prune",(PyCFunction)nglpy_cuda_core_prune, METH_VARARGS|METH_KEYWORDS, ""},
-    {"associate_probability",(PyCFunction)nglpy_cuda_core_probability, METH_VARARGS, ""},
+    {"associate_probability",(PyCFunction)nglpy_cuda_core_probability, METH_VARARGS|METH_KEYWORDS, ""},
     {"get_available_device_memory",(PyCFunction)nglpy_cuda_core_get_available_memory, METH_NOARGS, ""},
     {NULL, NULL, 0, NULL}
 };
