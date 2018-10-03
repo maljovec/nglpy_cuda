@@ -17,16 +17,18 @@ class TestGraph(unittest.TestCase):
         """
 
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        self.points = np.loadtxt(os.path.join(dir_path, 'data', 'points.txt'))
-        gold = np.loadtxt(os.path.join(dir_path, 'data',
-                                       'gold_edges_strict.txt'))
+        self.points = np.loadtxt(os.path.join(dir_path, "data", "points.txt"))
+        gold = np.loadtxt(
+            os.path.join(dir_path, "data", "gold_edges_strict.txt")
+        )
         self.gold_strict = set()
         for edge in gold:
             lo, hi = min(edge), max(edge)
             self.gold_strict.add((lo, hi))
 
-        gold = np.loadtxt(os.path.join(dir_path, 'data',
-                                       'gold_edges_relaxed.txt'))
+        gold = np.loadtxt(
+            os.path.join(dir_path, "data", "gold_edges_relaxed.txt")
+        )
         self.gold_relaxed = set()
         for edge in gold:
             lo, hi = min(edge), max(edge)
@@ -38,8 +40,15 @@ class TestGraph(unittest.TestCase):
         strict case for both discrete and continuous algorithms.
         """
         self.setup()
-        graph = ngl.Graph(self.points, index=None, max_neighbors=-1,
-                          relaxed=False, beta=1, p=2.0, discrete_steps=-1)
+        graph = ngl.Graph(
+            index=None,
+            max_neighbors=-1,
+            relaxed=False,
+            beta=1,
+            p=2.0,
+            discrete_steps=-1,
+        )
+        graph.build(self.points)
 
         test = set()
         for e1, e2, d in graph:
@@ -47,9 +56,15 @@ class TestGraph(unittest.TestCase):
 
         self.assertSetEqual(self.gold_strict, test)
 
-        graph = ngl.Graph(self.points, index=None, max_neighbors=-1,
-                          relaxed=False, beta=1, p=2.0, discrete_steps=100)
-
+        graph = ngl.Graph(
+            index=None,
+            max_neighbors=-1,
+            relaxed=False,
+            beta=1,
+            p=2.0,
+            discrete_steps=100,
+        )
+        graph.build(self.points)
         test = set()
         for e1, e2, d in graph:
             test.add((min(e1, e2), max(e1, e2)))
@@ -62,18 +77,31 @@ class TestGraph(unittest.TestCase):
         strict case for both discrete and continuous algorithms.
         """
         self.setup()
-        graph = ngl.Graph(self.points, index=None, max_neighbors=-1,
-                          relaxed=True, beta=1, p=2.0, discrete_steps=-1)
-
+        graph = ngl.Graph(
+            index=None,
+            max_neighbors=-1,
+            relaxed=True,
+            beta=1,
+            p=2.0,
+            discrete_steps=-1,
+        )
+        graph.build(self.points)
         test = set()
         for e1, e2, d in graph:
             test.add((min(e1, e2), max(e1, e2)))
 
         self.assertSetEqual(self.gold_relaxed, test)
 
-        graph = ngl.Graph(self.points, index=None, max_neighbors=-1,
-                          relaxed=True, beta=1, p=2.0, discrete_steps=100)
+        graph = ngl.Graph(
+            index=None,
+            max_neighbors=-1,
+            relaxed=True,
+            beta=1,
+            p=2.0,
+            discrete_steps=100,
+        )
 
+        graph.build(self.points)
         test = set()
         for e1, e2, d in graph:
             test.add((min(e1, e2), max(e1, e2)))
@@ -81,5 +109,5 @@ class TestGraph(unittest.TestCase):
         self.assertSetEqual(self.gold_relaxed, test)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
