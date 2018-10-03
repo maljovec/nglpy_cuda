@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <sys/time.h>
 #include <unistd.h>
+#include <iomanip>
+
   typedef struct timeval timestamp;
   static inline float operator - (const timestamp &t1, const timestamp &t2)
   {
@@ -97,6 +99,7 @@ int main(int argc, char **argv)
   cl.addArgument("-k", "-1", "K max", false);
   cl.addArgument("-b", "1.0", "Beta", false);
   cl.addArgument("-p", "2.0", "Lp-norm", false);
+  cl.addArgument("-a", "3.0", "Steepness", false);
   cl.addArgument("-r", "0", "Relaxed", false);
   cl.addArgument("-s", "-1", "# of Discretization Steps. Use -1 to disallow discretization.", false);
   bool hasArguments = cl.processArgs(argc, argv);
@@ -117,10 +120,12 @@ int main(int argc, char **argv)
 
   float beta = cl.getArgFloat("-b");
   float lp = cl.getArgFloat("-p");
+  float steepness = cl.getArgFloat("-a");
 
   // Load data set and edges from files
   float *x;
   int *edgesOut;
+  float *probabilities;
   float *referenceShape;
 
   int i, d, k;
@@ -129,6 +134,7 @@ int main(int argc, char **argv)
 
   x = new float[N*D];
   edgesOut = new int[N*K];
+  probabilities = new float[N*K];
   if(discrete) {
     referenceShape = new float[steps+1];
   }
@@ -174,32 +180,55 @@ int main(int argc, char **argv)
   std::cerr << "Reading Graph " << t2-t1 << " s" << std::endl;
   t1 = now();
 
-  if(discrete) {
-      std::cerr << "\tDiscrete Graph requested" << std::endl;
-      nglcu::create_template(referenceShape, beta, lp, steps);
-      nglcu::prune_discrete(x, edgesOut, NULL, N, D, N, K, referenceShape, steps, relaxed);
-      t2 = now();
-      std::cerr << "GPU execution with template " << t2-t1 << " s" << std::endl;
-      t1 = now();
-      nglcu::prune_discrete(x, edgesOut, NULL, N, D, N, K, NULL, steps, relaxed, beta, lp);
-      t2 = now();
-      std::cerr << "GPU execution without template " << t2-t1 << " s" << std::endl;
-      t1 = now();
-  }
-  else {
-      nglcu::prune(x, edgesOut, NULL, N, D, N, K, relaxed, beta, lp);
+//   if(discrete) {
+//       std::cerr << "\tDiscrete Graph requested" << std::endl;
+//       nglcu::create_template(referenceShape, beta, lp, steps);
+//       nglcu::prune_discrete(x, edgesOut, NULL, N, D, N, K, referenceShape, steps, relaxed);
+//       t2 = now();
+//       std::cerr << "GPU execution with template " << t2-t1 << " s" << std::endl;
+//       t1 = now();
+//       nglcu::prune_discrete(x, edgesOut, NULL, N, D, N, K, NULL, steps, relaxed, beta, lp);
+//       t2 = now();
+//       std::cerr << "GPU execution without template " << t2-t1 << " s" << std::endl;
+//       t1 = now();
+//   }
+//   else {
+//       nglcu::prune(x, edgesOut, NULL, N, D, N, K, relaxed, beta, lp);
+//   }
 
-      t2 = now();
-      std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;
-      t1 = now();
-  }
+  nglcu::associate_probability(x, edgesOut, probabilities, NULL, N, D, N, K, steepness, relaxed, beta, lp);
+
+  t2 = now();
+  std::cerr << "GPU execution " << t2-t1 << " s" << std::endl;
+  t1 = now();
 
   for(i = 0; i < N; i++) {
     for(k = 0; k < K; k++) {
-      if (edgesOut[i*K+k] != -1) {
-        std::cout << i << " " << edgesOut[i*K+k] << std::endl;
-      }
+        if (k > 0) {
+            std::cout << " ";
+        }
+        std::cout << std::setw(2) << edgesOut[i*K+k];
     }
+    std::cout << std::endl;
+  }
+
+  std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+  std::cout << "     Probabilities" << std::endl;
+  std::cout << std::setw(6) << std::setprecision(3);
+  for(i = 0; i < N; i++) {
+    for(k = 0; k < K; k++) {
+        if (k > 0) {
+            std::cout << " ";
+        }
+        if (probabilities[i*K+k] == 0 || probabilities[i*K+k] == 1) {
+            std::cout << std::setw(5) << std::left << std::fixed << std::setprecision(0) << probabilities[i*K+k];
+        }
+        else{
+            std::cout << std::setw(5) << std::left << std::fixed << std::setprecision(3) << probabilities[i*K+k];
+        }
+
+    }
+    std::cout << std::endl;
   }
 
   t2 = now();
@@ -209,6 +238,7 @@ int main(int argc, char **argv)
   // Free memory
   delete [] x;
   delete [] edgesOut;
+  delete [] probabilities;
   if(discrete) {
       delete [] referenceShape;
   }

@@ -36,9 +36,18 @@ namespace nglcu {
         }
     }
 
+    __device__
+    float logistic_function(float x, float r, float steepness=3.) {
+        // P(0) = 0.047... ~ 0.0
+        // P(r) = 0.5
+        // P(3*r) = 0.997... ~ 1.0
+        float k = steepness / r;
+        return 1. / (1. + expf(-k*(x - r)));
+    }
+
     __global__
-    void prune_discrete_d(float *X, int *edgesIn, const int N, const int D,
-                        const int K, float *erTemplate, const int steps,
+    void prune_discrete_d(float *X, int *edgesIn, int N, int D,
+                        int K, float *erTemplate, int steps,
                         int *edgesOut) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
@@ -120,9 +129,9 @@ namespace nglcu {
     }
 
     __global__
-    void prune_discrete_relaxed_d(float *X, int *edgesIn, const int N,
-                                  const int D, const int K, float *erTemplate,
-                                  const int steps, int *edgesOut) {
+    void prune_discrete_relaxed_d(float *X, int *edgesIn, int N,
+                                  int D, int K, float *erTemplate,
+                                  int steps, int *edgesOut) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
 
@@ -204,7 +213,7 @@ namespace nglcu {
     }
 
     __global__
-    void prune_d(float *X, int *edgesIn, const int N, const int D, const int K,
+    void prune_d(float *X, int *edgesIn, int N, int D, int K,
                 float lp, float beta, int *edgesOut) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
@@ -296,8 +305,8 @@ namespace nglcu {
     }
 
     __global__
-    void prune_relaxed_d(float *X, int *edgesIn, const int N, const int D,
-                         const int K, float lp, float beta, int *edgesOut) {
+    void prune_relaxed_d(float *X, int *edgesIn, int N, int D,
+                         int K, float lp, float beta, int *edgesOut) {
         int index_x = blockIdx.x * blockDim.x + threadIdx.x;
         int stride_x = blockDim.x * gridDim.x;
 
@@ -386,6 +395,216 @@ namespace nglcu {
                         if(sqrt(squared_distance_to_edge) < minimum_allowable_distance) {
                             edgesOut[K*i+k] = -1;
                             break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    __global__
+    void probability_d(float *X,
+                       int *edgesIn,
+                       int N,
+                       int D,
+                       int K,
+                       float lp,
+                       float beta,
+                       float steepness,
+                       float *probabilities) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+        int stride_y = blockDim.y * gridDim.y;
+
+        float *p, *q, *r;
+
+        float pq[10] = {};
+        float pr[10] = {};
+
+        int i, j, k, k2, d, n;
+        float t;
+
+        float length_squared;
+        float squared_distance_to_edge;
+        float probability;
+        float minimum_allowable_distance;
+
+        ////////////////////////////////////////////////////////////
+        float xC, yC, radius, y;
+        ////////////////////////////////////////////////////////////
+
+        for (k = index_y; k < K; k += stride_y) {
+            for (i = index_x; i < N; i += stride_x) {
+                p = &(X[D*i]);
+                j = edgesIn[K*i+k];
+                q = &(X[D*j]);
+                // Initialize the probability to 1 and reduce it from
+                // there
+                probabilities[K*i+k] = 1;
+
+                length_squared = 0;
+                for(d = 0; d < D; d++) {
+                    pq[d] = p[d] - q[d];
+                    length_squared += pq[d]*pq[d];
+                }
+                // A point should not be connected to itself
+                if(length_squared == 0) {
+                    probabilities[K*i+k] = 0;
+                    continue;
+                }
+
+                // for(n = 0; n < N; n++) {
+                for(k2 = 0; k2 < 2*K; k2++) {
+                    n = (k2 < K) ? edgesIn[K*i+k2] : edgesIn[K*j+(k2-K)];
+                    r = &(X[D*n]);
+
+                    // t is the parameterization of the projection of pr
+                    // onto pq. In layman's terms, this is the length of
+                    // the shadow pr casts onto pq
+                    t = 0;
+                    for(d = 0; d < D; d++) {
+                        pr[d] = p[d] - r[d];
+                        t += pr[d]*pq[d];
+                    }
+
+                    t /= length_squared;
+
+                    if (t > 0 && t < 1) {
+                        squared_distance_to_edge = 0;
+                        for(d = 0; d < D; d++) {
+                            squared_distance_to_edge += (pr[d] - pq[d]*t)*(pr[d] - pq[d]*t);
+                        }
+
+                        ////////////////////////////////////////////////
+                        // ported from python function, can possibly be
+                        // improved in terms of performance
+                        xC = 0;
+                        yC = 0;
+
+                        if (beta <= 1) {
+                            radius = 1. / beta;
+                            yC = powf(powf(radius, lp) - 1, 1. / lp);
+                        }
+                        else {
+                            radius = beta;
+                            xC = 1. - beta;
+                        }
+                        t = fabs(2*t-1);
+                        y = powf(powf(radius, lp) - powf(t-xC, lp), 1. / lp) - yC;
+                        minimum_allowable_distance = 0.5*y*sqrt(length_squared);
+
+                        probability = logistic_function(sqrt(squared_distance_to_edge), minimum_allowable_distance, steepness);
+
+                        if(probability < probabilities[K*i+k]) {
+                            probabilities[K*i+k] = probability;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    __global__
+    void probability_relaxed_d(float *X,
+                               int *edgesIn,
+                               int N,
+                               int D,
+                               int K,
+                               float lp,
+                               float beta,
+                               float steepness,
+                               float *probabilities) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        // We should use a 1D structure for this since we need to guarantee
+        // that other points have already been processed
+        // int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+        // int stride_y = blockDim.y * gridDim.y;
+
+        float *p, *q, *r;
+
+        float pq[10] = {};
+        float pr[10] = {};
+
+        int i, j, k, k2, d, n;
+        float t;
+
+        float length_squared;
+        float squared_distance_to_edge;
+        float probability;
+        float minimum_allowable_distance;
+
+        ////////////////////////////////////////////////////////////
+        float xC, yC, radius, y;
+        ////////////////////////////////////////////////////////////
+
+        for (i = index_x; i < N; i += stride_x) {
+            for (k = 0; k < K; k++) {
+                p = &(X[D*i]);
+                j = edgesIn[K*i+k];
+                q = &(X[D*j]);
+
+                length_squared = 0;
+                for(d = 0; d < D; d++) {
+                    pq[d] = p[d] - q[d];
+                    length_squared += pq[d]*pq[d];
+                }
+                // A point should not be connected to itself
+                if(length_squared == 0) {
+                    probabilities[K*i+k] = 0;
+                    continue;
+                }
+
+                // This loop presumes that all nearer neighbors have
+                // already been processed
+                for(k2 = 0; k2 < k; k2++) {
+                    n = edgesIn[K*i+k2];
+                    if (n == -1 || probabilities[K*i+k2] < 1e-6 ){
+                        continue;
+                    }
+                    r = &(X[D*n]);
+
+                    // t is the parameterization of the projection of pr onto pq
+                    // In layman's terms, this is the length of the shadow pr casts onto pq
+                    t = 0;
+                    for(d = 0; d < D; d++) {
+                        pr[d] = p[d] - r[d];
+                        t += pr[d]*pq[d];
+                    }
+
+                    t /= length_squared;
+
+                    if (t > 0 && t < 1) {
+                        squared_distance_to_edge = 0;
+                        for(d = 0; d < D; d++) {
+                            squared_distance_to_edge += (pr[d] - pq[d]*t)*(pr[d] - pq[d]*t);
+                        }
+
+                        ////////////////////////////////////////////////////////////
+                        // ported from python function, can possibly be improved
+                        // in terms of performance
+                        xC = 0;
+                        yC = 0;
+
+                        if (beta <= 1) {
+                            radius = 1. / beta;
+                            yC = powf(powf(radius, lp) - 1, 1. / lp);
+                        }
+                        else {
+                            radius = beta;
+                            xC = 1. - beta;
+                        }
+                        t = fabs(2*t-1);
+                        y = powf(powf(radius, lp) - powf(t-xC, lp), 1. / lp) - yC;
+                        minimum_allowable_distance = 0.5*y*sqrt(length_squared);
+
+                        probability = logistic_function(sqrt(squared_distance_to_edge), minimum_allowable_distance, steepness);
+
+                        if(probability < probabilities[K*i+k]) {
+                            probabilities[K*i+k] = probability;
                         }
                     }
                 }
@@ -595,6 +814,83 @@ namespace nglcu {
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
+    }
+
+    void associate_probability(float *X,
+                               int *edges,
+                               float *probabilities,
+                               int *indices,
+                               int N,
+                               int D,
+                               int M,
+                               int K,
+                               float steepness,
+                               bool relaxed,
+                               float beta,
+                               float lp,
+                               int count) {
+        float *x_d;
+        int *edgesIn_d;
+        float *probabilities_d;
+
+        if (count < 0) {
+            count = N;
+        }
+
+        cudaMallocManaged(&edgesIn_d, M*K*sizeof(int));
+        memcpy(edgesIn_d, edges, M*K*sizeof(int));
+
+        cudaMallocManaged(&probabilities_d, count*K*sizeof(float));
+        // We don't care what probabilities_d holds initially, we will
+        // overwrite it.
+
+        if (indices != NULL) {
+            int *map_d;
+            int i;
+
+            cudaMallocManaged(&map_d, N*sizeof(int));
+            for(i = 0; i < N; i++) {
+                map_d[indices[i]] = i;
+            }
+            map_indices(edgesIn_d, map_d, M, K);
+            cudaFree(map_d);
+        }
+
+        cudaMallocManaged(&x_d, N*D*sizeof(float));
+        memcpy(x_d, X, N*D*sizeof(float));
+
+        if (relaxed) {
+            probability_relaxed_d<<<grid_size, block_size>>>(x_d,
+                                                             edgesIn_d,
+                                                             count,
+                                                             D,
+                                                             K,
+                                                             lp,
+                                                             beta,
+                                                             steepness,
+                                                             probabilities_d);
+        }
+        else {
+            probability_d<<<grid_size, block_size>>>(x_d,
+                                                     edgesIn_d,
+                                                     count,
+                                                     D,
+                                                     K,
+                                                     lp,
+                                                     beta,
+                                                     steepness,
+                                                     probabilities_d);
+        }
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+            printf("Error: %s\n", cudaGetErrorString(err));
+        cudaDeviceSynchronize();
+
+        memcpy(probabilities, probabilities_d, count*K*sizeof(float));
+
+        cudaFree(x_d);
+        cudaFree(edgesIn_d);
+        cudaFree(probabilities_d);
     }
 
     void print_cuda_info() {

@@ -99,7 +99,16 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args, PyObject*
     int steps = -1;
 
     static char* argnames[] = {"X", "edges", "indices", "template", "steps", "count", "relaxed", "beta", "lp", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|O&O&iipff", argnames, PyArray_Converter, &X_arr, PyArray_Converter, &edges_arr, PyArray_Converter, &indices_arr, PyArray_Converter, &template_arr, &steps, &count, &relaxed, &beta, &lp))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|O&O&iipff", argnames, 
+			             PyArray_Converter, &X_arr, 
+				     PyArray_Converter, &edges_arr, 
+				     PyArray_Converter, &indices_arr, 
+				     PyArray_Converter, &template_arr, 
+				     &steps, 
+				     &count, 
+				     &relaxed, 
+				     &beta, 
+				     &lp))
         return NULL;
 
     npy_intp idx[2];
@@ -138,6 +147,70 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args, PyObject*
     return PyArray_Return(edges_arr);
 }
 
+static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args, PyObject* kwargs) {
+    //import_array();
+    int N;
+    int D;
+    int M;
+    int K;
+    float lp = 2.0;
+    float beta = 1.0;
+    bool relaxed = false;
+    int count = -1;
+    PyArrayObject *X_arr;
+    PyArrayObject *edges_arr;
+    PyArrayObject *probability_arr;
+    PyArrayObject *indices_arr = NULL;
+    PyArrayObject *template_arr = NULL;
+    int steps = -1;
+
+    float steepness = 3;
+
+    static char* argnames[] = {"X", "edges", "steepness", "indices", "template", "steps", "count", "relaxed", "beta", "lp", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|fO&O&iipff", argnames,
+			             PyArray_Converter, &X_arr, 
+				     PyArray_Converter, &edges_arr, 
+				     &steepness, 
+				     PyArray_Converter, &indices_arr, 
+				     PyArray_Converter, &template_arr, 
+				     &steps, 
+				     &count, 
+				     &relaxed, 
+				     &beta, 
+				     &lp))
+        return NULL;
+
+    npy_intp idx[2];
+    idx[0] = idx[1] = 0;
+    float *X = (float *)PyArray_GetPtr(X_arr, idx);
+    int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
+    int *indices = NULL;
+    if (indices_arr != NULL) {
+        indices = (int *)PyArray_GetPtr(indices_arr, idx);
+    }
+
+    N = PyArray_DIM(X_arr, 0);
+    if (count < 0) {
+        count = N;
+    }
+    D = PyArray_DIM(X_arr, 1);
+    M = PyArray_DIM(edges_arr, 0);
+    K = PyArray_DIM(edges_arr, 1);
+
+    //Reuse this array since we already have it allocated
+    idx[0] = count;
+    idx[1] = K;
+    probability_arr = (PyArrayObject *)PyArray_ZEROS(2, idx, NPY_FLOAT32, 0);
+    idx[0] = idx[1] = 0;
+    float *probabilities = (float *)PyArray_GetPtr(probability_arr, idx);
+    nglcu::associate_probability(X, edges, probabilities, indices, N, D, M, K, steepness, relaxed, beta, lp, count);
+
+    Py_DECREF(X_arr);
+    //Py_DECREF(edges_arr);
+
+    return PyArray_Return(probability_arr);
+}
+
 static PyObject* nglpy_cuda_core_get_available_memory(PyObject *self) {
     return Py_BuildValue("i", (int)nglcu::get_available_device_memory());
 }
@@ -147,6 +220,7 @@ static PyMethodDef nglpy_cuda_core_methods[] = {
     {"create_template",(PyCFunction)nglpy_cuda_core_create_template, METH_VARARGS, ""},
     {"min_distance_from_edge",(PyCFunction)nglpy_cuda_core_min_distance_from_edge, METH_VARARGS, ""},
     {"prune",(PyCFunction)nglpy_cuda_core_prune, METH_VARARGS|METH_KEYWORDS, ""},
+    {"associate_probability",(PyCFunction)nglpy_cuda_core_probability, METH_VARARGS|METH_KEYWORDS, ""},
     {"get_available_device_memory",(PyCFunction)nglpy_cuda_core_get_available_memory, METH_NOARGS, ""},
     {NULL, NULL, 0, NULL}
 };
