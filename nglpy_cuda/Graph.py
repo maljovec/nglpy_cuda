@@ -1,6 +1,7 @@
 """
     The API for using NGLPy with CUDA
 """
+import os
 from threading import Thread
 from queue import Queue, Empty
 
@@ -26,7 +27,8 @@ class Graph(object):
                  beta=1,
                  p=2.0,
                  discrete_steps=-1,
-                 query_size=None):
+                 query_size=None,
+                 cached=False):
         """Initialization of the graph object. This will convert all of
         the passed in parameters into parameters the C++ implementation
         of NGL can understand and then issue an external call to that
@@ -48,6 +50,10 @@ class Graph(object):
             query_size (int): The number of points to process with each
                 call to the GPU, this should be computed based on
                 available resources
+            cached (bool): Flag denoting whether the resulting computation
+                should be stored for future use, will consume more memory,
+                but can drastically reduce the runtime for subsequent
+                iterations through the data.
         """
         self.X = np.array([[]], dtype=f32)
         self.max_neighbors = max_neighbors
@@ -60,6 +66,7 @@ class Graph(object):
         else:
             self.nn_index = index
         self.query_size = query_size
+        self.cached = cached
         self.edges = None
         self.distances = None
 
@@ -110,10 +117,10 @@ class Graph(object):
         self.query_size = int(self.query_size)
 
         self.chunked = self.X.shape[0] > self.query_size
-        # print('Problem Size: {}'.format(N))
-        # print('  Query Size: {}'.format(self.query_size))
-        # print('  GPU Memory: {}'.format(available_gpu_memory))
-        # print('     Chunked: {}'.format(self.chunked))
+        print('Problem Size: {}'.format(N))
+        print('  Query Size: {}'.format(self.query_size))
+        print('  GPU Memory: {}'.format(available_gpu_memory))
+        print('     Chunked: {}'.format(self.chunked))
 
         self.edge_list = Queue(self.query_size*10)
         self.needs_reset = False
@@ -126,10 +133,12 @@ class Graph(object):
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
 
+        print('Query KNN')
         distances, edges = self.nn_index.search(working_set,
                                                 self.max_neighbors)
 
         indices = working_set
+        print('Get Additional Indices')
         # We will need the locations of these additional points since
         # we need to know if they fall into the empty region of any
         # edges above
@@ -162,6 +171,7 @@ class Graph(object):
 
         indices = indices.astype(i32)
         X = self.X[indices, :]
+        print('Calling Prune')
         edges = ngl.prune(X,
                           edges,
                           indices=indices,
@@ -172,13 +182,16 @@ class Graph(object):
                           count=count)
 
         # We will cache these for later use
-        self.edges[start_index:end_index, :] = edges[:count]
-        self.distances[start_index:end_index, :] = distances[:count]
+        if self.cached:
+            print('Updating Cached data')
+            self.edges[start_index:end_index, :] = edges[:count]
+            self.distances[start_index:end_index, :] = distances[:count]
 
         # Since, we are taking a lot of time to generate these, then we
         # should give the user something to process in the meantime, so
         # don't remove these lines and make sure to return in the main
         # populate before the same process is done again.
+        print('Put edges on Queue for consumption')
         self.push_edges(edges[:count], distances[:count])
 
     def populate_whole(self):
@@ -194,25 +207,42 @@ class Graph(object):
                           beta=self.beta,
                           lp=self.p)
 
-        self.edges = edges
-        self.distances = distances
+        if self.cached:
+            self.edges = edges
+            self.distances = distances
+        self.push_edges(edges, distances)
 
     def populate(self):
-        if self.edges is None:
-            data_shape = (self.X.shape[0], self.max_neighbors)
-            self.edges = np.memmap(
-                'edges.npy', dtype=i32, mode='w+', shape=data_shape)
-            self.distances = np.memmap(
-                'distances.npy', dtype=f32, mode='w+', shape=data_shape)
+        point_count = self.X.shape[0]
+        start_index = 0
+        if self.edges is not None:
+            start_index = point_count
+
+        fname = 'nglpy.checkpoint'
+        if self.cached and os.path.isfile(fname):
+            with open(fname, 'r') as f:
+                start_index = int(f.read())
+
+        if self.edges is None or start_index < point_count:
+            data_shape = (point_count, self.max_neighbors)
+            if self.cached:
+                self.edges = np.memmap(
+                    'edges.npy', dtype=i32, mode='w+', shape=data_shape)
+                self.distances = np.memmap(
+                    'distances.npy', dtype=f32, mode='w+', shape=data_shape)
+
             if self.chunked:
-                start_index = 0
-                while start_index < self.X.shape[0]:
+                while start_index < point_count:
                     self.populate_chunk(start_index)
                     start_index += self.query_size
+                    with open(fname, 'w') as f:
+                        f.write(str(start_index))
+
                 return
             else:
                 self.populate_whole()
-        self.push_edges(self.edges, self.distances)
+        else:
+            self.push_edges(self.edges, self.distances)
 
     def push_edges(self, edges, distances):
         valid_edges = ngl.get_edge_list(edges, distances)
@@ -259,6 +289,9 @@ class Graph(object):
 
     def neighbors(self, i):
         nn = []
+        if self.edges is None:
+            raise NotImplementedError
+
         for value in self.edges[i]:
             if value != -1:
                 nn.append(value)
