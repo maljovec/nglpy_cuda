@@ -32,6 +32,7 @@ class ProbabilisticGraph(Graph):
         p=2.0,
         discrete_steps=-1,
         query_size=None,
+        cached=True
     ):
         """Initialization of the graph object. This will convert all of
         the passed in parameters into parameters the C++ implementation
@@ -54,6 +55,8 @@ class ProbabilisticGraph(Graph):
             query_size (int): The number of points to process with each
                 call to the GPU, this should be computed based on
                 available resources
+            cached (bool): must be true for now in order to ensure the
+                algorithm returns edges deterministically.
         """
         self.steepness = steepness
         self.seed = 0
@@ -66,6 +69,7 @@ class ProbabilisticGraph(Graph):
             p=p,
             discrete_steps=discrete_steps,
             query_size=query_size,
+            cached=True
         )
 
     def reseed(self, seed):
@@ -123,9 +127,10 @@ class ProbabilisticGraph(Graph):
             count=count,
         )
 
-        self.edges[start_index:end_index, :] = edges[:count]
-        self.distances[start_index:end_index, :] = distances[:count]
-        self.probabilities[start_index:end_index, :] = probabilities[:count]
+        if self.cached:
+            self.edges[start_index:end_index, :] = edges[:count]
+            self.distances[start_index:end_index, :] = distances[:count]
+            self.probabilities[start_index:end_index, :] = probabilities[:count]
 
         # Since, we are taking a lot of time to generate these, then we
         # should give the user something to process in the meantime, so
@@ -150,27 +155,41 @@ class ProbabilisticGraph(Graph):
             beta=self.beta,
             lp=self.p,
         )
-
-        self.edges = edges
-        self.distances = distances
-        self.probabilities = probabilities
+        if self.cached:
+            self.edges = edges
+            self.distances = distances
+            self.probabilities = probabilities
 
     def populate(self):
-        if self.edges is None:
+        point_count = self.X.shape[0]
+        start_index = 0
+        if self.edges is not None:
+            start_index = point_count
+
+        fname = 'nglpy.checkpoint'
+        if self.cached and os.path.isfile(fname):
+            with open(fname, 'r') as f:
+                start_index = int(f.read())
+
+
+        if self.edges is None or start_index < point_count:
             data_shape = (self.X.shape[0], self.max_neighbors)
-            self.edges = np.memmap(
-                'edges.npy', dtype=i32, mode='w+', shape=data_shape)
-            self.distances = np.memmap(
-                'distances.npy', dtype=f32, mode='w+', shape=data_shape)
-            self.probabilities = np.memmap(
-                'probabilities.npy', dtype=f32, mode='w+', shape=data_shape)
+            if self.cached:
+                self.edges = np.memmap(
+                    'edges.npy', dtype=i32, mode='w+', shape=data_shape)
+                self.distances = np.memmap(
+                    'distances.npy', dtype=f32, mode='w+', shape=data_shape)
+                self.probabilities = np.memmap(
+                    'probabilities.npy', dtype=f32, mode='w+', shape=data_shape)
+
             if self.chunked:
                 np.random.seed(self.seed)
                 start_index = 0
                 while start_index < self.X.shape[0]:
                     self.populate_chunk(start_index)
                     start_index += self.query_size
-                return
+                    with open(fname, 'w') as f:
+                        f.write(str(start_index))
             else:
                 self.populate_whole()
         np.random.seed(self.seed)
