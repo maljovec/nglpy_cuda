@@ -28,7 +28,7 @@ class Graph(object):
                  p=2.0,
                  discrete_steps=-1,
                  query_size=None,
-                 cached=False):
+                 cached=True):
         """Initialization of the graph object. This will convert all of
         the passed in parameters into parameters the C++ implementation
         of NGL can understand and then issue an external call to that
@@ -228,15 +228,13 @@ class Graph(object):
                     start_index += self.query_size
                     with open(fname, 'w') as f:
                         f.write(str(start_index))
-
-                return
             else:
                 self.populate_whole()
         else:
             self.push_edges(self.edges, self.distances)
 
-    def push_edges(self, edges, distances):
-        valid_edges = ngl.get_edge_list(edges, distances)
+    def push_edges(self, edges, distances, indices=None):
+        valid_edges = ngl.get_edge_list(edges, distances, indices)
         for edge in valid_edges:
             self.edge_list.put(edge)
 
