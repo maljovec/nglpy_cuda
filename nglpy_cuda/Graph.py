@@ -117,10 +117,6 @@ class Graph(object):
         self.query_size = int(self.query_size)
 
         self.chunked = self.X.shape[0] > self.query_size
-        print('Problem Size: {}'.format(N))
-        print('  Query Size: {}'.format(self.query_size))
-        print('  GPU Memory: {}'.format(available_gpu_memory))
-        print('     Chunked: {}'.format(self.chunked))
 
         self.edge_list = Queue(self.query_size*10)
         self.needs_reset = False
@@ -133,12 +129,10 @@ class Graph(object):
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
 
-        print('Query KNN')
         distances, edges = self.nn_index.search(working_set,
                                                 self.max_neighbors)
 
         indices = working_set
-        print('Get Additional Indices')
         # We will need the locations of these additional points since
         # we need to know if they fall into the empty region of any
         # edges above
@@ -171,7 +165,6 @@ class Graph(object):
 
         indices = indices.astype(i32)
         X = self.X[indices, :]
-        print('Calling Prune')
         edges = ngl.prune(X,
                           edges,
                           indices=indices,
@@ -183,7 +176,6 @@ class Graph(object):
 
         # We will cache these for later use
         if self.cached:
-            print('Updating Cached data')
             self.edges[start_index:end_index, :] = edges[:count]
             self.distances[start_index:end_index, :] = distances[:count]
 
@@ -191,8 +183,7 @@ class Graph(object):
         # should give the user something to process in the meantime, so
         # don't remove these lines and make sure to return in the main
         # populate before the same process is done again.
-        print('Put edges on Queue for consumption')
-        self.push_edges(edges[:count], distances[:count])
+        self.push_edges(edges[:count], distances[:count], indices[:count])
 
     def populate_whole(self):
         count = self.X.shape[0]
