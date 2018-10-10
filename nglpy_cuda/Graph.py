@@ -238,7 +238,10 @@ class Graph(object):
             self.push_edges(self.edges, self.distances)
 
     def push_edges(self, edges, distances, indices=None):
-        valid_edges = ngl.get_edge_list(edges, distances, indices)
+        if indices is not None:
+            valid_edges = ngl.get_edge_list(edges, distances, indices)
+        else:
+            valid_edges = ngl.get_edge_list(edges, distances)
         for edge in valid_edges:
             self.edge_list.put(edge)
 
