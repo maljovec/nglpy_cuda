@@ -781,12 +781,12 @@ namespace nglcu {
             int *map_d;
             int i;
 
-	    int max_index = 0;
-	    for(i = 0; i < N; i++) {
-	        if(indices[i] > max_index) {
-		        max_index = indices[i];
-		    }
-	    }
+            int max_index = 0;
+            for(i = 0; i < N; i++) {
+                if(indices[i] > max_index) {
+                    max_index = indices[i];
+                }
+            }
 
             cudaMallocManaged(&map_d, max_index*sizeof(int));
             for(i = 0; i < N; i++) {
