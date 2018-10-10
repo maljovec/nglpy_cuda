@@ -35,8 +35,6 @@ class Graph(object):
         library.
 
         Args:
-            X (matrix): The data matrix for which we will be determining
-                connectivity.
             index (string): A nearest neighbor index structure which can
                 be queried and pruned
             max_neighbors (int): The maximum number of neighbors to
@@ -71,6 +69,12 @@ class Graph(object):
         self.distances = None
 
     def build(self, X):
+        """ Build a graph based on the incoming data
+
+        Args:
+            X (matrix): The data matrix for which we will be determining
+                connectivity.
+        """
         self.X = np.array(X, dtype=f32)
         N = len(X)
 
