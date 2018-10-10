@@ -183,7 +183,7 @@ class Graph(object):
         # should give the user something to process in the meantime, so
         # don't remove these lines and make sure to return in the main
         # populate before the same process is done again.
-        self.push_edges(edges[:count], distances[:count])
+        self.push_edges(edges[:count], distances[:count], indices[:count])
 
     def populate_whole(self):
         count = self.X.shape[0]
@@ -218,8 +218,11 @@ class Graph(object):
                 self.populate_whole()
         self.push_edges(self.edges, self.distances)
 
-    def push_edges(self, edges, distances):
-        valid_edges = ngl.get_edge_list(edges, distances)
+    def push_edges(self, edges, distances, indices=None):
+        if indices is not None:
+            valid_edges = ngl.get_edge_list(edges, distances, indices)
+        else:
+            valid_edges = ngl.get_edge_list(edges, distances)
         for edge in valid_edges:
             self.edge_list.put(edge)
 
