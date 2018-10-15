@@ -11,6 +11,8 @@ import numpy as np
 from .utils import f32, i32
 from .SKLSearchIndex import SKLSearchIndex
 
+import time
+import psutil
 
 class Graph(object):
     """ A neighborhood graph that represents the connectivity of a given
@@ -122,6 +124,11 @@ class Graph(object):
 
         self.chunked = self.X.shape[0] > self.query_size
 
+        print('Problem Size: {}'.format(N), flush=True)
+        print('  Query Size: {}'.format(self.query_size), flush=True)
+        print('  GPU Memory: {}'.format(available_gpu_memory), flush=True)
+        print('     Chunked: {}'.format(self.chunked), flush=True)
+
         self.edge_list = Queue(self.query_size*10)
         self.needs_reset = False
 
@@ -133,8 +140,14 @@ class Graph(object):
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
 
+        start = time.time()
+
         distances, edges = self.nn_index.search(working_set,
                                                 self.max_neighbors)
+
+        end = time.time()
+        print('Initial KNN retrieval: {} s'.format(end-start), flush=True)
+        start = time.time()
 
         indices = working_set
         # We will need the locations of these additional points since
@@ -143,11 +156,20 @@ class Graph(object):
         additional_indices = np.setdiff1d(edges.ravel(),
                                           working_set)
 
+        end = time.time()
+        print('Calculating additional indices: {} s'.format(end-start), flush=True)
+        start = time.time()
+
         if additional_indices.shape[0] > 0:
             # It is possible that we cannot store the entirety of X
             # and edges on the GPU, so figure out the subset of Xs and
             # carefully replace the edges values
             indices = np.hstack((working_set, additional_indices))
+
+            end = time.time()
+            print('Stacking indices: {} s'.format(end-start), flush=True)
+            start = time.time()
+
             if not self.relaxed:
                 neighbor_edges = self.nn_index.search(additional_indices,
                                                       self.max_neighbors,
@@ -169,6 +191,13 @@ class Graph(object):
 
         indices = indices.astype(i32)
         X = self.X[indices, :]
+
+        end = time.time()
+        print('Retyping indices and subsetting X: {} s'.format(end-start), flush=True)
+        print('\tMemory Available before: {}'.format(ngl.get_available_device_memory()), flush=True)
+        print(psutil.virtual_memory())
+        start = time.time()
+
         edges = ngl.prune(X,
                           edges,
                           indices=indices,
@@ -178,16 +207,30 @@ class Graph(object):
                           lp=self.p,
                           count=count)
 
+        end = time.time()
+        print('Actual Pruning: {} s'.format(end-start), flush=True)
+        print('\tMemory Available after: {}'.format(ngl.get_available_device_memory()), flush=True)
+        print(psutil.virtual_memory())
+        start = time.time()
+
         # We will cache these for later use
         if self.cached:
             self.edges[start_index:end_index, :] = edges[:count]
             self.distances[start_index:end_index, :] = distances[:count]
+
+            end = time.time()
+            print('Caching: {} s'.format(end-start), flush=True)
+            start = time.time()
 
         # Since, we are taking a lot of time to generate these, then we
         # should give the user something to process in the meantime, so
         # don't remove these lines and make sure to return in the main
         # populate before the same process is done again.
         self.push_edges(edges[:count], distances[:count], indices[:count])
+
+        end = time.time()
+        print('Updating edge queue: {} s'.format(end-start), flush=True)
+        start = time.time()
 
     def populate_whole(self):
         count = self.X.shape[0]
@@ -230,8 +273,10 @@ class Graph(object):
                 while start_index < point_count:
                     self.populate_chunk(start_index)
                     start_index += self.query_size
+                    start_index = min(start_index, point_count)
                     with open(fname, 'w') as f:
                         f.write(str(start_index))
+                    print('Checkpoint: {}'.format(start_index))
             else:
                 self.populate_whole()
         else:

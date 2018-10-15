@@ -1,6 +1,8 @@
 #include "ngl_cuda.cuh"
 #include <cstdio>
 #include <map>
+#include <chrono>
+#include <iostream>
 
 #define cudaErrchk(ans) { GPUAssert((ans), __FILE__, __LINE__); }
 inline void GPUAssert(cudaError_t code, const char *file, int line,
@@ -623,8 +625,16 @@ namespace nglcu {
     void unmap_indices(int *matrix_d, int *map, int M, int N, int K) {
         int *map_d;
 
+        auto start = std::chrono::high_resolution_clock::now();
+        std::cout << "\n\t\tAllocating map_d (" << get_available_device_memory() - K*sizeof(int) << "): " << std::flush;
+
         cudaMallocManaged(&map_d, K*sizeof(int));
         memcpy(map_d, map, K*sizeof(int));
+
+        auto end = std::chrono::high_resolution_clock::now();
+        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+        std::cout << "\t" << "\tDevice call: " << std::flush;
+        start = std::chrono::high_resolution_clock::now();
 
         unmap_indices_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
 
@@ -632,7 +642,16 @@ namespace nglcu {
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
+
+        end = std::chrono::high_resolution_clock::now();
+        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+        std::cout << "\t\t" << "\Memory free: " << std::flush;
+        start = std::chrono::high_resolution_clock::now();
+
         cudaFree(map_d);
+
+        end = std::chrono::high_resolution_clock::now();
+        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
     }
 
     float min_distance_from_edge(float t, float beta, float p) {
@@ -771,11 +790,20 @@ namespace nglcu {
             count = N;
         }
 
+        auto start = std::chrono::high_resolution_clock::now();
+        auto end = std::chrono::high_resolution_clock::now();
+        std::cout << "\t" << "Memory allocation for edges (" << get_available_device_memory() - M*K*sizeof(int) - count*K*sizeof(int) << "): " << std::flush;
+
         cudaMallocManaged(&edgesIn_d, M*K*sizeof(int));
         memcpy(edgesIn_d, edges, M*K*sizeof(int));
 
         cudaMallocManaged(&edgesOut_d, count*K*sizeof(int));
         memcpy(edgesOut_d, edges, count*K*sizeof(int));
+
+        end = std::chrono::high_resolution_clock::now();
+	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+        start = std::chrono::high_resolution_clock::now();
+	    std::cout << "\t" << "Memory allocation for index map " << std::flush;
 
         if (indices != NULL) {
             int *map_d;
@@ -788,17 +816,46 @@ namespace nglcu {
                 }
             }
 
+            std::cout << "(" << get_available_device_memory() - max_index*sizeof(int) << "): " << std::flush;
             cudaMallocManaged(&map_d, max_index*sizeof(int));
             for(i = 0; i < N; i++) {
                 map_d[indices[i]] = i;
             }
+
+            end = std::chrono::high_resolution_clock::now();
+	        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+            start = std::chrono::high_resolution_clock::now();
+	        std::cout << "\t" << "Mapping indices for edgesIn: " << std::flush;
+
             map_indices(edgesIn_d, map_d, M, K);
+
+            end = std::chrono::high_resolution_clock::now();
+	        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+            start = std::chrono::high_resolution_clock::now();
+	        std::cout << "\t" << "Mapping indices for edgesOut: " << std::flush;
+
             map_indices(edgesOut_d, map_d, count, K);
+
+            end = std::chrono::high_resolution_clock::now();
+	        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+            start = std::chrono::high_resolution_clock::now();
+	        std::cout << "\t" << "Freeing map index: " << std::flush;
+
             cudaFree(map_d);
         }
 
+        end = std::chrono::high_resolution_clock::now();
+	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+        start = std::chrono::high_resolution_clock::now();
+	    std::cout << "\t" << "Memory allocation for X (" << get_available_device_memory() - N*D*sizeof(float) << "): " << std::flush;
+
         cudaMallocManaged(&x_d, N*D*sizeof(float));
         memcpy(x_d, X, N*D*sizeof(float));
+
+        end = std::chrono::high_resolution_clock::now();
+	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+        start = std::chrono::high_resolution_clock::now();
+	    std::cout << "\t" << "Device call: " << std::flush;
 
         if (relaxed) {
             prune_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, count, D, K, lp, beta, edgesOut_d);
@@ -812,15 +869,33 @@ namespace nglcu {
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
 
+        end = std::chrono::high_resolution_clock::now();
+	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+        start = std::chrono::high_resolution_clock::now();
+
         if (indices != NULL) {
             unmap_indices(edgesOut_d, indices, count, K, N);
         }
 
+        end = std::chrono::high_resolution_clock::now();
+        std::cout << "\t" << "Unmap indices: " << std::flush;
+	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+        start = std::chrono::high_resolution_clock::now();
+	    std::cout << "\t" << "Copying back: " << std::flush;
+
         memcpy(edges, edgesOut_d, count*K*sizeof(int));
+
+        end = std::chrono::high_resolution_clock::now();
+	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+        start = std::chrono::high_resolution_clock::now();
+	    std::cout << "\t" << "Free remaining memory: " << std::flush;
 
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
+
+	    end = std::chrono::high_resolution_clock::now();
+	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
     }
 
     void associate_probability(float *X,
