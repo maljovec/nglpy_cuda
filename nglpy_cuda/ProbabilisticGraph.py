@@ -3,8 +3,7 @@
     a drop-in replacement. Consider this class for deprecation due to
     inefficient handling of neighborhood queries.
 """
-from threading import Thread
-from queue import Queue, Empty
+import sys
 
 import nglpy_cuda as ngl
 import numpy as np
