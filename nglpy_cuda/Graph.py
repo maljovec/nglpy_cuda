@@ -1,19 +1,18 @@
 """
     The API for using NGLPy with CUDA
 """
-from threading import Thread
-import sys
-if sys.version_info.major >= 3:
-    from queue import Queue, Empty
-else:
-    from Queue import Queue, Empty
-
 import nglpy_cuda as ngl
 import numpy as np
 
 from .utils import f32, i32
 from .SKLSearchIndex import SKLSearchIndex
 
+from threading import Thread
+import sys
+if sys.version_info.major >= 3:
+    from queue import Queue, Empty
+else:
+    from Queue import Queue, Empty
 
 class Graph(object):
     """ A neighborhood graph that represents the connectivity of a given

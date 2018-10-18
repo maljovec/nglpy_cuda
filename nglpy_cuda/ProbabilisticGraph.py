@@ -73,7 +73,8 @@ class ProbabilisticGraph(Graph):
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
 
-        distances, edges = self.nn_index.search(working_set, self.max_neighbors)
+        distances, edges = self.nn_index.search(working_set,
+                                                self.max_neighbors)
 
         indices = working_set
         # We will need the locations of these additional points since
@@ -99,7 +100,8 @@ class ProbabilisticGraph(Graph):
                 # Since we will be using the edges above for queries, we
                 # need to make sure we have the locations of everything
                 # they touch
-                neighbor_indices = np.setdiff1d(neighbor_edges.ravel(), indices)
+                neighbor_indices = np.setdiff1d(neighbor_edges.ravel(),
+                                                indices)
 
                 if neighbor_indices.shape[0] > 0:
                     indices = np.hstack((indices, neighbor_indices))
@@ -133,7 +135,8 @@ class ProbabilisticGraph(Graph):
     def populate_whole(self):
         count = self.X.shape[0]
         working_set = np.array(range(count))
-        distances, edges = self.nn_index.search(working_set, self.max_neighbors)
+        distances, edges = self.nn_index.search(working_set,
+                                                self.max_neighbors)
 
         probabilities = ngl.associate_probability(
             self.X,
