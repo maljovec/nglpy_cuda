@@ -175,10 +175,17 @@ class Graph(object):
                                                       self.max_neighbors,
                                                       False)
 
+                end = time.time()
+                print('Secondary knn query: {} s'.format(end-start), flush=True)
+                start = time.time()
                 # We don't care about whether any of the edges of these
                 # extra rows are valid yet, but the algorithm will need
                 # them to prune correctly
                 edges = np.vstack((edges, neighbor_edges))
+
+                end = time.time()
+                print('Stacking edges: {} s'.format(end-start), flush=True)
+                start = time.time()
 
                 # Since we will be using the edges above for queries, we
                 # need to make sure we have the locations of everything
@@ -186,14 +193,24 @@ class Graph(object):
                 neighbor_indices = np.setdiff1d(neighbor_edges.ravel(),
                                                 indices)
 
+                end = time.time()
+                print('Calculating neighbor indices: {} s'.format(end-start), flush=True)
+                start = time.time()
+
                 if neighbor_indices.shape[0] > 0:
                     indices = np.hstack((indices, neighbor_indices))
+
+                end = time.time()
+                print('Stacking neighboring indices: {} s'.format(end-start), flush=True)
+                start = time.time()
+
 
         indices = indices.astype(i32)
         X = self.X[indices, :]
 
         end = time.time()
         print('Retyping indices and subsetting X: {} s'.format(end-start), flush=True)
+        print(X.shape)
         print('\tMemory Available before: {}'.format(ngl.get_available_device_memory()), flush=True)
         print(psutil.virtual_memory())
         start = time.time()
