@@ -235,7 +235,8 @@ class Graph(object):
         if not self.worker_thread.is_alive() and self.needs_reset:
             self.edge_list.queue.clear()
             self.needs_reset = False
-            self.worker_thread = Thread(target=self.populate, daemon=True)
+            self.worker_thread = Thread(target=self.populate)
+            self.worker_thread.daemon = True
             self.worker_thread.start()
 
     def __iter__(self):
