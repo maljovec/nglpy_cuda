@@ -10,4 +10,4 @@ from .ProbabilisticGraph import ProbabilisticGraph
 from .SKLSearchIndex import SKLSearchIndex
 # from .FAISSSearchIndex import FAISSSearchIndex
 from .utils import *
-from nglpy_cuda.core import *
+from .core import *
