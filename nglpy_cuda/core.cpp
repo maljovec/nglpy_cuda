@@ -168,16 +168,16 @@ static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args, PyO
 
     static char* argnames[] = {"X", "edges", "steepness", "indices", "template", "steps", "count", "relaxed", "beta", "lp", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|fO&O&iipff", argnames,
-			             PyArray_Converter, &X_arr,
-				     PyArray_Converter, &edges_arr,
-				     &steepness,
-				     PyArray_Converter, &indices_arr,
-				     PyArray_Converter, &template_arr,
-				     &steps,
-				     &count,
-				     &relaxed,
-				     &beta,
-				     &lp))
+                                     PyArray_Converter, &X_arr,
+                                     PyArray_Converter, &edges_arr,
+                                     &steepness,
+                                     PyArray_Converter, &indices_arr,
+                                     PyArray_Converter, &template_arr,
+                                     &steps,
+                                     &count,
+                                     &relaxed,
+                                     &beta,
+                                     &lp))
         return NULL;
 
     npy_intp idx[2];
@@ -239,8 +239,7 @@ PyMODINIT_FUNC PyInit_core(){
     return PyModule_Create(&module_def);
 }
 #else
-PyMODINIT_FUNC
-initcore(){
+PyMODINIT_FUNC initcore(){
     import_array();
     Py_InitModule("core", nglpy_cuda_core_methods);
 }
