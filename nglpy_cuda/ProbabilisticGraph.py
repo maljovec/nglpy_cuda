@@ -3,14 +3,11 @@
     a drop-in replacement. Consider this class for deprecation due to
     inefficient handling of neighborhood queries.
 """
-from threading import Thread
-from queue import Queue, Empty
 
 import nglpy_cuda as ngl
 import numpy as np
 
 from .utils import f32, i32
-from .SKLSearchIndex import SKLSearchIndex
 from .Graph import Graph
 
 
@@ -80,8 +77,8 @@ class ProbabilisticGraph(Graph):
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
 
-        distances, edges = self.nn_index.search(
-            working_set, self.max_neighbors)
+        distances, edges = self.nn_index.search(working_set,
+                                                self.max_neighbors)
 
         indices = working_set
         # We will need the locations of these additional points since
@@ -107,8 +104,8 @@ class ProbabilisticGraph(Graph):
                 # Since we will be using the edges above for queries, we
                 # need to make sure we have the locations of everything
                 # they touch
-                neighbor_indices = np.setdiff1d(
-                    neighbor_edges.ravel(), indices)
+                neighbor_indices = np.setdiff1d(neighbor_edges.ravel(),
+                                                indices)
 
                 if neighbor_indices.shape[0] > 0:
                     indices = np.hstack((indices, neighbor_indices))
@@ -136,15 +133,15 @@ class ProbabilisticGraph(Graph):
         # should give the user something to process in the meantime, so
         # don't remove these lines and make sure to return in the main
         # populate before the same process is done again.
-        mask = np.random.binomial(1, 1-probabilities[:count]).astype(bool)
+        mask = np.random.binomial(1, 1 - probabilities[:count]).astype(bool)
         edges[mask] = -1
         self.push_edges(edges[:count], distances[:count])
 
     def populate_whole(self):
         count = self.X.shape[0]
         working_set = np.array(range(count))
-        distances, edges = self.nn_index.search(
-            working_set, self.max_neighbors)
+        distances, edges = self.nn_index.search(working_set,
+                                                self.max_neighbors)
 
         probabilities = ngl.associate_probability(
             self.X,

@@ -99,16 +99,16 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args, PyObject*
     int steps = -1;
 
     static char* argnames[] = {"X", "edges", "indices", "template", "steps", "count", "relaxed", "beta", "lp", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|O&O&iipff", argnames, 
-			             PyArray_Converter, &X_arr, 
-				     PyArray_Converter, &edges_arr, 
-				     PyArray_Converter, &indices_arr, 
-				     PyArray_Converter, &template_arr, 
-				     &steps, 
-				     &count, 
-				     &relaxed, 
-				     &beta, 
-				     &lp))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|O&O&iiiff", argnames,
+                                     PyArray_Converter, &X_arr,
+                                     PyArray_Converter, &edges_arr,
+                                     PyArray_Converter, &indices_arr,
+                                     PyArray_Converter, &template_arr,
+                                     &steps,
+                                     &count,
+                                     &relaxed,
+                                     &beta,
+                                     &lp))
         return NULL;
 
     npy_intp idx[2];
@@ -168,16 +168,16 @@ static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args, PyO
 
     static char* argnames[] = {"X", "edges", "steepness", "indices", "template", "steps", "count", "relaxed", "beta", "lp", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|fO&O&iipff", argnames,
-			             PyArray_Converter, &X_arr, 
-				     PyArray_Converter, &edges_arr, 
-				     &steepness, 
-				     PyArray_Converter, &indices_arr, 
-				     PyArray_Converter, &template_arr, 
-				     &steps, 
-				     &count, 
-				     &relaxed, 
-				     &beta, 
-				     &lp))
+                                     PyArray_Converter, &X_arr,
+                                     PyArray_Converter, &edges_arr,
+                                     &steepness,
+                                     PyArray_Converter, &indices_arr,
+                                     PyArray_Converter, &template_arr,
+                                     &steps,
+                                     &count,
+                                     &relaxed,
+                                     &beta,
+                                     &lp))
         return NULL;
 
     npy_intp idx[2];
@@ -225,7 +225,7 @@ static PyMethodDef nglpy_cuda_core_methods[] = {
     {NULL, NULL, 0, NULL}
 };
 
-
+#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef module_def = {
     PyModuleDef_HEAD_INIT,
     "nglpy_cuda.core",
@@ -238,3 +238,9 @@ PyMODINIT_FUNC PyInit_core(){
     import_array();
     return PyModule_Create(&module_def);
 }
+#else
+PyMODINIT_FUNC initcore(){
+    import_array();
+    Py_InitModule("core", nglpy_cuda_core_methods);
+}
+#endif
