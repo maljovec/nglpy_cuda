@@ -2,15 +2,18 @@
     The API for using NGLPy with CUDA
 """
 import os
-from threading import Thread
-from queue import Queue, Empty
-
 import nglpy_cuda as ngl
 import numpy as np
 
 from .utils import f32, i32
 from .SKLSearchIndex import SKLSearchIndex
 
+from threading import Thread
+import sys
+if sys.version_info.major >= 3:
+    from queue import Queue, Empty
+else:
+    from Queue import Queue, Empty
 
 class Graph(object):
     """ A neighborhood graph that represents the connectivity of a given
@@ -35,8 +38,6 @@ class Graph(object):
         library.
 
         Args:
-            X (matrix): The data matrix for which we will be determining
-                connectivity.
             index (string): A nearest neighbor index structure which can
                 be queried and pruned
             max_neighbors (int): The maximum number of neighbors to
@@ -71,6 +72,12 @@ class Graph(object):
         self.distances = None
 
     def build(self, X):
+        """ Build a graph based on the incoming data
+
+        Args:
+            X (matrix): The data matrix for which we will be determining
+                connectivity.
+        """
         self.X = np.array(X, dtype=f32)
         N = len(X)
 
@@ -121,7 +128,8 @@ class Graph(object):
         self.edge_list = Queue(self.query_size*10)
         self.needs_reset = False
 
-        self.worker_thread = Thread(target=self.populate, daemon=True)
+        self.worker_thread = Thread(target=self.populate)
+        self.worker_thread.daemon = True
         self.worker_thread.start()
 
     def populate_chunk(self, start_index):
@@ -234,7 +242,10 @@ class Graph(object):
             self.push_edges(self.edges, self.distances)
 
     def push_edges(self, edges, distances, indices=None):
-        valid_edges = ngl.get_edge_list(edges, distances, indices)
+        if indices is not None:
+            valid_edges = ngl.get_edge_list(edges, distances, indices)
+        else:
+            valid_edges = ngl.get_edge_list(edges, distances)
         for edge in valid_edges:
             self.edge_list.put(edge)
 
@@ -242,7 +253,8 @@ class Graph(object):
         if not self.worker_thread.is_alive() and self.needs_reset:
             self.edge_list.queue.clear()
             self.needs_reset = False
-            self.worker_thread = Thread(target=self.populate, daemon=True)
+            self.worker_thread = Thread(target=self.populate)
+            self.worker_thread.daemon = True
             self.worker_thread.start()
 
     def __iter__(self):

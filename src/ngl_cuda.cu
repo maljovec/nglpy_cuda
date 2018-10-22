@@ -783,7 +783,7 @@ namespace nglcu {
 
             int max_index = 0;
             for(i = 0; i < N; i++) {
-                if (indices[i] > max_index) {
+                if(indices[i] > max_index) {
                     max_index = indices[i];
                 }
             }
