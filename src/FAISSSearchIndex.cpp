@@ -5,7 +5,7 @@
  *      Author: maljovec
  */
 
-#include "SearchIndex.h"
+#include "FAISSSearchIndex.h"
 
 class FAISSSearchIndex::FAISSSearchIndex() {
 

@@ -8,11 +8,12 @@
 #ifndef NGL_GRAPH_H
 #define NGL_GRAPH_H
 #include "SearchIndex.h"
+#include <cstdlib>
 
 struct Edge {
     int indices[2];
     float distance;
-}
+};
 
 class Graph
 {
@@ -25,7 +26,7 @@ public:
           float p=2.0,
           int discreteSteps=-1,
           int querySize=-1);
-    void build(float *X);
+    void build(float *X, int N, int D);
     void populate();
     void populate_chunk(int startIndex);
     void populate_whole();
@@ -58,6 +59,7 @@ private:
     int mCurrentCol = 0;
     bool mReversed = false;
     bool mChunked = false;
+    bool mIterationFinished = false;
 };
 
 #endif

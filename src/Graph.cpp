@@ -9,8 +9,10 @@
 #include "SearchIndex.h"
 #include "ANNSearchIndex.h"
 #include "ngl_cuda.h"
+#include <cstdlib>
 #include <vector>
 #include <set>
+#include <iostream>
 
 Graph::Graph(SearchIndex *index,
              int maxNeighbors,
@@ -32,7 +34,7 @@ Graph::Graph(SearchIndex *index,
     }
     else
     {
-        mSearchIndex = new ANNSearchIndex(maxNeighbors, 0);
+        mSearchIndex = new ANNSearchIndex(0);
         mSelfConstructedIndex = true;
     }
 }
@@ -49,7 +51,7 @@ void Graph::build(float *X, int N, int D)
     {
         // Because we are using f32 and i32:
         int bytesPerNumber = 4;
-        int k = maxNeighbors;
+        int k = mMaxNeighbors;
         int worstCase;
 
         // Worst-case upper bound limit of the number of points
@@ -83,7 +85,7 @@ void Graph::build(float *X, int N, int D)
         }
 
         int divisor = bytesPerNumber * worstCase;
-        mQuerySize = std::min(availableGPUMemory / divisor, mCount);
+        mQuerySize = std::min((int)availableGPUMemory / divisor, mCount);
     }
     mChunked = mQuerySize < mCount;
     populate();
@@ -124,14 +126,14 @@ void Graph::populate_chunk(int startIndex)
             }
         }
     }
+    std::vector<int> indices;
+    for (int i = startIndex; i < endIndex; i++)
+    {
+        indices.push_back(i);
+    }
 
     if (additionalIndices.size() > 0)
     {
-        std::vector<int> indices;
-        for (int i = startIndex; i < endIndex; i++)
-        {
-            indices.push_back(i);
-        }
         int extraCount = additionalIndices.size();
         for (auto it = additionalIndices.begin(); it != additionalIndices.end(); it++)
         {
@@ -185,7 +187,7 @@ void Graph::populate_chunk(int startIndex)
     if (mDiscreteSteps > 0)
     {
         nglcu::prune_discrete(X, mEdges, indices.data(), count, mDim, edgeCount,
-                              mMaxNeighbors, mRelaxed, mBeta, mLp);
+                              mMaxNeighbors, NULL, mDiscreteSteps, mRelaxed, mBeta, mLp);
     }
     else
     {
@@ -199,8 +201,24 @@ void Graph::populate_chunk(int startIndex)
 void Graph::populate_whole()
 {
     mSearchIndex->search(0, mCount, mMaxNeighbors, mEdges, mDistances);
-    nglcu::prune(mData, mEdges, NULL, mCount, mDim, mCount,
-                 mMaxNeighbors, mRelaxed, mBeta, mLp);
+    if (mDiscreteSteps > 0)
+    {
+        nglcu::prune_discrete(mData, mEdges, NULL, mCount, mDim, mCount,
+                              mMaxNeighbors, NULL, mDiscreteSteps, mRelaxed, mBeta, mLp);
+    }
+    else
+    {
+        nglcu::prune(mData, mEdges, NULL, mCount, mDim, mCount,
+                     mMaxNeighbors, mRelaxed, mBeta, mLp);
+        for (int i = 0; i < mCount; i++)
+        {
+            for (int k = 0; k < mMaxNeighbors; k++)
+            {
+                std::cout << mEdges[i * mMaxNeighbors + k] << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
 }
 
 void Graph::restart_iteration()
@@ -209,7 +227,7 @@ void Graph::restart_iteration()
     mCurrentRow = 0;
     // If we have changed rows, let's ensure we don't need to run
     // another query
-    if (chunked && mRowOffset > mCurrentRow)
+    if (mChunked && mRowOffset > mCurrentRow)
     {
         populate_chunk(mCurrentRow);
     }
@@ -218,12 +236,13 @@ void Graph::restart_iteration()
 Edge Graph::next()
 {
     Edge e;
-    if(mIterationFinished) {
+    if (mIterationFinished)
+    {
         // Set up the next round of iteration
         mIterationFinished = false;
         e.indices[0] = -1;
         e.indices[1] = -1;
-        e.length = 0;
+        e.distance = 0;
         return e;
     }
     int currentIndex = (mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol;
@@ -243,7 +262,8 @@ Edge Graph::next()
     if (!mReversed)
     {
         advanceIteration();
-        while(mEdges[(mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol] == -1) {
+        while (mEdges[(mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol] == -1)
+        {
             advanceIteration();
         }
     }
@@ -251,7 +271,8 @@ Edge Graph::next()
     return e;
 }
 
-void Graph::advanceIteration() {
+void Graph::advanceIteration()
+{
     mCurrentCol++;
     if (mCurrentCol >= mMaxNeighbors)
     {
@@ -264,7 +285,8 @@ void Graph::advanceIteration() {
         }
         // If we have changed rows, let's ensure we don't need to run
         // another query
-        if (chunked) {
+        if (mChunked)
+        {
             if (mCurrentRow - mRowOffset >= mQuerySize || mCurrentRow == 0)
             {
                 populate_chunk(mCurrentRow);
@@ -273,7 +295,7 @@ void Graph::advanceIteration() {
     }
 }
 
-virtual Graph::~Graph()
+Graph::~Graph()
 {
     if (mSelfConstructedIndex)
     {
