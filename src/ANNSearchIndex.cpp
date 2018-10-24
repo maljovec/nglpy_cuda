@@ -35,7 +35,7 @@ void ANNSearchIndex::search(int *indices, int N, int K, int *k_indices, float *d
             k_indices[idx] = nnIdx[k];
             if (distances != NULL)
             {
-                distances[idx] = dists[k];
+                distances[idx] = sqrt(dists[k]);
             }
         }
     }
@@ -56,7 +56,7 @@ void ANNSearchIndex::search(int startIndex, int count, int K, int *k_indices, fl
             k_indices[idx] = nnIdx[k];
             if (distances != NULL)
             {
-                distances[idx] = dists[k];
+                distances[idx] = sqrt(dists[k]);
             }
         }
     }
