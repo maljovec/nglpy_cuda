@@ -219,13 +219,13 @@ void Graph::populate_whole()
 
 void Graph::restart_iteration()
 {
+    mIterationFinished = false;
     mCurrentCol = 0;
     mCurrentRow = 0;
-    // If we have changed rows, let's ensure we don't need to run
-    // another query
-    if (mChunked && mRowOffset > mCurrentRow)
+    // Load up the first edge
+    while (mEdges[(mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol] == -1)
     {
-        populate_chunk(mCurrentRow);
+        advanceIteration();
     }
 }
 
