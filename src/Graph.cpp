@@ -12,7 +12,6 @@
 #include <cstdlib>
 #include <vector>
 #include <set>
-#include <iostream>
 
 Graph::Graph(SearchIndex *index,
              int maxNeighbors,
@@ -89,6 +88,11 @@ void Graph::build(float *X, int N, int D)
     }
     mChunked = mQuerySize < mCount;
     populate();
+    // Load up the first edge
+    while (mEdges[(mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol] == -1)
+    {
+        advanceIteration();
+    }
 }
 
 void Graph::populate()
@@ -210,14 +214,6 @@ void Graph::populate_whole()
     {
         nglcu::prune(mData, mEdges, NULL, mCount, mDim, mCount,
                      mMaxNeighbors, mRelaxed, mBeta, mLp);
-        for (int i = 0; i < mCount; i++)
-        {
-            for (int k = 0; k < mMaxNeighbors; k++)
-            {
-                std::cout << mEdges[i * mMaxNeighbors + k] << " ";
-            }
-            std::cout << std::endl;
-        }
     }
 }
 
