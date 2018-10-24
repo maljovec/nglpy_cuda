@@ -218,34 +218,54 @@ void Graph::restart_iteration()
 Edge Graph::next()
 {
     Edge e;
+    if(mIterationFinished) {
+        // Set up the next round of iteration
+        mIterationFinished = false;
+        e.indices[0] = -1;
+        e.indices[1] = -1;
+        e.length = 0;
+        return e;
+    }
+    int currentIndex = (mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol;
+    e.distance = mDistances[currentIndex];
     if (mReversed)
     {
-        e.indices[0] = mEdges[(mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol];
+        e.indices[0] = mEdges[currentIndex];
         e.indices[1] = mCurrentRow;
-        e.distance = mDistances[(mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol];
     }
     else
     {
         e.indices[0] = mCurrentRow;
-        e.indices[1] = mEdges[(mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol];
-        e.distance = mDistances[(mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol];
+        e.indices[1] = mEdges[currentIndex];
     }
 
     mReversed = !mReversed;
     if (!mReversed)
     {
-        mCurrentCol++;
-        if (mCurrentCol >= mMaxNeighbors)
+        advanceIteration();
+        while(mEdges[(mCurrentRow - mRowOffset) * mMaxNeighbors + mCurrentCol] == -1) {
+            advanceIteration();
+        }
+    }
+
+    return e;
+}
+
+void Graph::advanceIteration() {
+    mCurrentCol++;
+    if (mCurrentCol >= mMaxNeighbors)
+    {
+        mCurrentCol = 0;
+        mCurrentRow++;
+        if (mCurrentRow >= mCount)
         {
-            mCurrentCol = 0;
-            mCurrentRow++;
-            if (mCurrentRow >= mCount)
-            {
-                mCurrentRow = 0;
-            }
-            // If we have changed rows, let's ensure we don't need to run
-            // another query
-            if (mCurrentRow - mRowOffset >= mQuerySize || (chunked && mCurrentRow == 0))
+            mCurrentRow = 0;
+            mIterationFinished = true;
+        }
+        // If we have changed rows, let's ensure we don't need to run
+        // another query
+        if (chunked) {
+            if (mCurrentRow - mRowOffset >= mQuerySize || mCurrentRow == 0)
             {
                 populate_chunk(mCurrentRow);
             }

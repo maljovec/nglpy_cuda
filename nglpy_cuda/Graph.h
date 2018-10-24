@@ -35,6 +35,8 @@ public:
 
     virtual ~Graph();
 private:
+    void advanceIteration();
+
     float *mData;
     int mCount;
     int mDim;
@@ -51,6 +53,7 @@ private:
 
     int *mEdges;
     float *mDistances;
+    int mRowOffset = 0;
     int mCurrentRow = 0;
     int mCurrentCol = 0;
     bool mReversed = false;
