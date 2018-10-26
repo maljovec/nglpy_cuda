@@ -38,7 +38,7 @@ static PyObject* nglpy_cuda_core_get_edge_list(PyObject *self, PyObject *args) {
         }
     }
     //Second cycle: fill in the array
-    PyObject* edge_list = PyList_New(edge_count);
+    PyObject* edge_list = PyList_New(2*edge_count);
     edge_count = 0;
     for(i = 0; i < N; i++) {
         int pi = indices != NULL ? indices[i] : i;
@@ -46,6 +46,9 @@ static PyObject* nglpy_cuda_core_get_edge_list(PyObject *self, PyObject *args) {
             if (edges[i*K+k] != -1) {
 	            PyObject* item = Py_BuildValue("(iif)", pi, edges[i*K+k], distances[i*K+k]);
                 PyList_SetItem(edge_list, edge_count, item);
+	            edge_count++;
+	            PyObject* item2 = Py_BuildValue("(iif)", edges[i*K+k], pi, distances[i*K+k]);
+                PyList_SetItem(edge_list, edge_count, item2);
 	            edge_count++;
             }
         }
