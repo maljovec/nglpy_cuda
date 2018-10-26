@@ -142,13 +142,17 @@ int main(int argc, char **argv)
     t1 = now();
 
     float *x = new float[N * D];
+    auto myFile2 = std::fstream("points.txt", std::ios::out);
     for (i = 0; i < N; i++)
     {
         for (d = 0; d < D; d++)
         {
             x[i * D + d] = (float)rand() / RAND_MAX;
+            myFile2 << x[i * D + d] << " ";
         }
+        myFile2 << std::endl;
     }
+    myFile2.close();
 
     auto myFile = std::fstream("points.bin", std::ios::out | std::ios::binary);
     myFile.write((char *)x, N * D * sizeof(float));
