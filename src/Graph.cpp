@@ -190,13 +190,13 @@ void Graph::populate_chunk(int startIndex)
 
     if (mDiscreteSteps > 0)
     {
-        nglcu::prune_discrete(X, mEdges, indices.data(), count, mDim, edgeCount,
-                              mMaxNeighbors, NULL, mDiscreteSteps, mRelaxed, mBeta, mLp);
+        nglcu::prune_discrete(X, mEdges, indices.data(), indices.size(), mDim, edgeCount,
+                              mMaxNeighbors, NULL, mDiscreteSteps, mRelaxed, mBeta, mLp, count);
     }
     else
     {
-        nglcu::prune(X, mEdges, indices.data(), count, mDim, edgeCount,
-                     mMaxNeighbors, mRelaxed, mBeta, mLp);
+        nglcu::prune(X, mEdges, indices.data(), indices.size(), mDim, edgeCount,
+                     mMaxNeighbors, mRelaxed, mBeta, mLp, count);
     }
 
     delete X;
