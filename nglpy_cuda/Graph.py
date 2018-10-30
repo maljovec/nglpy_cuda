@@ -11,6 +11,7 @@ import time
 import psutil
 from threading import Thread
 import sys
+import os
 if sys.version_info.major >= 3:
     from queue import Queue, Empty
 else:
@@ -126,10 +127,11 @@ class Graph(object):
 
         self.chunked = self.X.shape[0] > self.query_size
 
-        print('Problem Size: {}'.format(N), flush=True)
-        print('  Query Size: {}'.format(self.query_size), flush=True)
-        print('  GPU Memory: {}'.format(available_gpu_memory), flush=True)
-        print('     Chunked: {}'.format(self.chunked), flush=True)
+        print('Problem Size: {}'.format(N))
+        print('  Query Size: {}'.format(self.query_size))
+        print('  GPU Memory: {}'.format(available_gpu_memory))
+        print('     Chunked: {}'.format(self.chunked))
+        sys.stdout.flush()
 
         self.edge_list = Queue(self.query_size*10)
         self.needs_reset = False
@@ -149,7 +151,8 @@ class Graph(object):
                                                 self.max_neighbors)
 
         end = time.time()
-        print('Initial KNN retrieval: {} s'.format(end-start), flush=True)
+        print('Initial KNN retrieval: {} s'.format(end-start))
+        sys.stdout.flush()
         start = time.time()
 
         indices = working_set
@@ -160,7 +163,8 @@ class Graph(object):
                                           working_set)
 
         end = time.time()
-        print('Calculating additional indices: {} s'.format(end-start), flush=True)
+        print('Calculating additional indices: {} s'.format(end-start))
+        sys.stdout.flush()
         start = time.time()
 
         if additional_indices.shape[0] > 0:
@@ -170,7 +174,8 @@ class Graph(object):
             indices = np.hstack((working_set, additional_indices))
 
             end = time.time()
-            print('Stacking indices: {} s'.format(end-start), flush=True)
+            print('Stacking indices: {} s'.format(end-start))
+            sys.stdout.flush()
             start = time.time()
 
             if not self.relaxed:
@@ -179,7 +184,8 @@ class Graph(object):
                                                       False)
 
                 end = time.time()
-                print('Secondary knn query: {} s'.format(end-start), flush=True)
+                print('Secondary knn query: {} s'.format(end-start))
+                sys.stdout.flush()
                 start = time.time()
                 # We don't care about whether any of the edges of these
                 # extra rows are valid yet, but the algorithm will need
@@ -187,7 +193,8 @@ class Graph(object):
                 edges = np.vstack((edges, neighbor_edges))
 
                 end = time.time()
-                print('Stacking edges: {} s'.format(end-start), flush=True)
+                print('Stacking edges: {} s'.format(end-start))
+                sys.stdout.flush()
                 start = time.time()
 
                 # Since we will be using the edges above for queries, we
@@ -197,14 +204,16 @@ class Graph(object):
                                                 indices)
 
                 end = time.time()
-                print('Calculating neighbor indices: {} s'.format(end-start), flush=True)
+                print('Calculating neighbor indices: {} s'.format(end-start))
+                sys.stdout.flush()
                 start = time.time()
 
                 if neighbor_indices.shape[0] > 0:
                     indices = np.hstack((indices, neighbor_indices))
 
                 end = time.time()
-                print('Stacking neighboring indices: {} s'.format(end-start), flush=True)
+                print('Stacking neighboring indices: {} s'.format(end-start))
+                sys.stdout.flush()
                 start = time.time()
 
 
@@ -212,9 +221,11 @@ class Graph(object):
         X = self.X[indices, :]
 
         end = time.time()
-        print('Retyping indices and subsetting X: {} s'.format(end-start), flush=True)
+        print('Retyping indices and subsetting X: {} s'.format(end-start))
+        sys.stdout.flush()
         print(X.shape)
-        print('\tMemory Available before: {}'.format(ngl.get_available_device_memory()), flush=True)
+        print('\tMemory Available before: {}'.format(ngl.get_available_device_memory()))
+        sys.stdout.flush()
         print(psutil.virtual_memory())
         start = time.time()
 
@@ -228,8 +239,10 @@ class Graph(object):
                           count=count)
 
         end = time.time()
-        print('Actual Pruning: {} s'.format(end-start), flush=True)
-        print('\tMemory Available after: {}'.format(ngl.get_available_device_memory()), flush=True)
+        print('Actual Pruning: {} s'.format(end-start))
+        sys.stdout.flush()
+        print('\tMemory Available after: {}'.format(ngl.get_available_device_memory()))
+        sys.stdout.flush()
         print(psutil.virtual_memory())
         start = time.time()
 
@@ -239,7 +252,8 @@ class Graph(object):
             self.distances[start_index:end_index, :] = distances[:count]
 
             end = time.time()
-            print('Caching: {} s'.format(end-start), flush=True)
+            print('Caching: {} s'.format(end-start))
+            sys.stdout.flush()
             start = time.time()
 
         # Since, we are taking a lot of time to generate these, then we
@@ -249,7 +263,8 @@ class Graph(object):
         self.push_edges(edges[:count], distances[:count], indices[:count])
 
         end = time.time()
-        print('Updating edge queue: {} s'.format(end-start), flush=True)
+        print('Updating edge queue: {} s'.format(end-start))
+        sys.stdout.flush()
         start = time.time()
 
     def populate_whole(self):

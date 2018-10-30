@@ -645,7 +645,7 @@ namespace nglcu {
 
         end = std::chrono::high_resolution_clock::now();
         std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        std::cout << "\t\t" << "\Memory free: " << std::flush;
+        std::cout << "\t\tMemory free: " << std::flush;
         start = std::chrono::high_resolution_clock::now();
 
         cudaFree(map_d);

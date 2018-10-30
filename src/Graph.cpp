@@ -12,6 +12,8 @@
 #include <cstdlib>
 #include <vector>
 #include <set>
+#include <chrono>
+#include <iostream>
 
 Graph::Graph(SearchIndex *index,
              int maxNeighbors,
@@ -117,7 +119,14 @@ void Graph::populate_chunk(int startIndex)
     int count = std::min(mCount - startIndex, mQuerySize);
     int edgeCount = count;
     int endIndex = startIndex + count;
+
+    auto start = std::chrono::high_resolution_clock::now();
+    std::cout << "Initial KNN retrieval: " << std::flush;
     mSearchIndex->search(mRowOffset, count, mMaxNeighbors, mEdges, mDistances);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+    start = std::chrono::high_resolution_clock::now();
+    std::cout << "Calculating additional indices: " << std::flush;
 
     std::set<int> additionalIndices;
     for (int i = 0; i < count; i++)
@@ -130,6 +139,12 @@ void Graph::populate_chunk(int startIndex)
             }
         }
     }
+
+    end = std::chrono::high_resolution_clock::now();
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+    start = std::chrono::high_resolution_clock::now();
+    std::cout << "Stacking indices: " << std::flush;
+
     std::vector<int> indices;
     for (int i = startIndex; i < endIndex; i++)
     {
@@ -143,11 +158,23 @@ void Graph::populate_chunk(int startIndex)
         {
             indices.push_back(*it);
         }
+
+        end = std::chrono::high_resolution_clock::now();
+        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+        start = std::chrono::high_resolution_clock::now();
+
         if (!mRelaxed)
         {
+            std::cout << "Secondary knn query: " << std::flush;
             int *extraEdges = new int[extraCount * mMaxNeighbors];
             int *extraIndices = indices.data() + count;
             mSearchIndex->search(extraIndices, extraCount, mMaxNeighbors, extraEdges, NULL);
+
+            end = std::chrono::high_resolution_clock::now();
+            std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+            start = std::chrono::high_resolution_clock::now();
+            std::cout << "Stacking edges: " << std::flush;
+
             delete extraIndices;
             edgeCount = count + extraCount;
             int *allEdges = new int[edgeCount * mMaxNeighbors];
@@ -172,13 +199,22 @@ void Graph::populate_chunk(int startIndex)
             delete extraEdges;
             mEdges = allEdges;
 
+            end = std::chrono::high_resolution_clock::now();
+            std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+            start = std::chrono::high_resolution_clock::now();
+            std::cout << "Stacking neighboring indices: " << std::flush;
+
             for (auto it = additionalIndices.begin(); it != additionalIndices.end(); it++)
             {
                 indices.push_back(*it);
             }
+
+            end = std::chrono::high_resolution_clock::now();
+            std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+            start = std::chrono::high_resolution_clock::now();
         }
     }
-
+    std::cout << "Subsetting X: " << std::flush;
     float *X = new float[indices.size() * mDim];
     for (int i = 0; i < indices.size(); i++)
     {
@@ -188,23 +224,36 @@ void Graph::populate_chunk(int startIndex)
         }
     }
 
+    end = std::chrono::high_resolution_clock::now();
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+    start = std::chrono::high_resolution_clock::now();
+
     if (mDiscreteSteps > 0)
     {
-        nglcu::prune_discrete(X, mEdges, indices.data(), count, mDim, edgeCount,
-                              mMaxNeighbors, NULL, mDiscreteSteps, mRelaxed, mBeta, mLp);
+        nglcu::prune_discrete(X, mEdges, indices.data(), indices.size(), mDim, edgeCount,
+                              mMaxNeighbors, NULL, mDiscreteSteps, mRelaxed, mBeta, mLp, count);
     }
     else
     {
-        nglcu::prune(X, mEdges, indices.data(), count, mDim, edgeCount,
-                     mMaxNeighbors, mRelaxed, mBeta, mLp);
+        nglcu::prune(X, mEdges, indices.data(), indices.size(), mDim, edgeCount,
+                     mMaxNeighbors, mRelaxed, mBeta, mLp, count);
     }
 
     delete X;
+    end = std::chrono::high_resolution_clock::now();
+    std::cout << "Actual Pruning: " << std::flush;
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
 }
 
 void Graph::populate_whole()
 {
+    auto start = std::chrono::high_resolution_clock::now();
+    std::cout << "Initial KNN Search " << std::flush;
     mSearchIndex->search(0, mCount, mMaxNeighbors, mEdges, mDistances);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
+    start = std::chrono::high_resolution_clock::now();
+
     if (mDiscreteSteps > 0)
     {
         nglcu::prune_discrete(mData, mEdges, NULL, mCount, mDim, mCount,
@@ -215,6 +264,9 @@ void Graph::populate_whole()
         nglcu::prune(mData, mEdges, NULL, mCount, mDim, mCount,
                      mMaxNeighbors, mRelaxed, mBeta, mLp);
     }
+    end = std::chrono::high_resolution_clock::now();
+    std::cout << "Actual Pruning: " << std::flush;
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
 }
 
 void Graph::restart_iteration()
