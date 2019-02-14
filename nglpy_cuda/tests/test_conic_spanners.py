@@ -2,7 +2,7 @@
     conic spanner graphs (Yao and Θ) type
 """
 import unittest
-import nglpy
+import nglpy_cuda as ngl
 import math
 import samply
 import numpy as np
@@ -33,7 +33,7 @@ class TestConics(unittest.TestCase):
         # well within the desired conic sections and reduce their
         # magnitudes by half. These set of points should be reported
         # as the edges of the Yao graph.
-        theta = 2 * math.pi / (count * 4)
+        theta = 2 * math.pi / (count * 8)
         rotation_matrix = np.array(
             [
                 [math.cos(theta), -math.sin(theta)],
@@ -52,7 +52,7 @@ class TestConics(unittest.TestCase):
         """ Test the Θ-Graph
         """
         self.setup()
-        edges = nglpy.conic_spanners.theta_graph(
+        edges = ngl.theta_graph(
             self.points, self.d, self.k, self.max_neighbors
         )
 
@@ -73,9 +73,7 @@ class TestConics(unittest.TestCase):
         """ Test the Yao Graph
         """
         self.setup()
-        edges = nglpy.conic_spanners.yao_graph(
-            self.points, self.d, self.k, self.max_neighbors
-        )
+        edges = ngl.yao_graph(self.points, self.d, self.k, self.max_neighbors)
 
         expected = set()
         for k in range(1, self.k+1):

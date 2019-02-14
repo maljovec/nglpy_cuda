@@ -40,7 +40,7 @@ class TestGraph(unittest.TestCase):
         strict case for both discrete and continuous algorithms.
         """
         self.setup()
-        graph = ngl.Graph(
+        graph = ngl.EmptyRegionGraph(
             index=None,
             max_neighbors=-1,
             relaxed=False,
@@ -56,7 +56,7 @@ class TestGraph(unittest.TestCase):
 
         self.assertSetEqual(self.gold_strict, test)
 
-        graph = ngl.Graph(
+        graph = ngl.EmptyRegionGraph(
             index=None,
             max_neighbors=-1,
             relaxed=False,
@@ -77,7 +77,7 @@ class TestGraph(unittest.TestCase):
         strict case for both discrete and continuous algorithms.
         """
         self.setup()
-        graph = ngl.Graph(
+        graph = ngl.EmptyRegionGraph(
             index=None,
             max_neighbors=-1,
             relaxed=True,
@@ -92,7 +92,7 @@ class TestGraph(unittest.TestCase):
 
         self.assertSetEqual(self.gold_relaxed, test)
 
-        graph = ngl.Graph(
+        graph = ngl.EmptyRegionGraph(
             index=None,
             max_neighbors=-1,
             relaxed=True,

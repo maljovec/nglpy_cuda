@@ -7,17 +7,19 @@ import numpy as np
 from .utils import f32, i32
 from .SKLSearchIndex import SKLSearchIndex
 
-import time
-import psutil
 from threading import Thread
 import sys
 import os
+import abc
 if sys.version_info.major >= 3:
     from queue import Queue, Empty
+    ABC = abc.ABC
 else:
     from Queue import Queue, Empty
+    ABC = abc.ABCMeta('ABC', (), {})
 
-class Graph(object):
+
+class Graph(ABC):
     """ A neighborhood graph that represents the connectivity of a given
     data matrix.
 
@@ -28,10 +30,6 @@ class Graph(object):
     def __init__(self,
                  index=None,
                  max_neighbors=-1,
-                 relaxed=False,
-                 beta=1,
-                 p=2.0,
-                 discrete_steps=-1,
                  query_size=None,
                  cached=True):
         """Initialization of the graph object. This will convert all of
@@ -44,12 +42,6 @@ class Graph(object):
                 be queried and pruned
             max_neighbors (int): The maximum number of neighbors to
                 associate with any single point in the dataset.
-            relaxed (bool): Whether the relaxed ERG should be computed
-            beta (float): Defines the shape of the beta skeleton
-            p (float): The Lp-norm to use in computing the shape
-            discrete_steps (int): The number of steps to use if using
-                the discrete version. -1 (default) signifies to use the
-                continuous algorithm.
             query_size (int): The number of points to process with each
                 call to the GPU, this should be computed based on
                 available resources
@@ -60,10 +52,6 @@ class Graph(object):
         """
         self.X = np.array([[]], dtype=f32)
         self.max_neighbors = max_neighbors
-        self.relaxed = relaxed
-        self.beta = beta
-        self.p = p
-        self.discrete_steps = discrete_steps
         if index is None:
             self.nn_index = SKLSearchIndex()
         else:
@@ -88,42 +76,8 @@ class Graph(object):
 
         self.nn_index.fit(self.X)
 
-        available_gpu_memory = ngl.get_available_device_memory()
         if self.query_size is None:
-            # Because we are using f32 and i32:
-            bytes_per_number = 4
-            N, D = X.shape
-            k = self.max_neighbors
-
-            # Worst-case upper bound limit of the number of points
-            # needed in a single query
-            if self.relaxed:
-                # For the relaxed algorithm we need n*D storage for the
-                # point locations plus n*k for the representation of the
-                # input edges plus another n*k for the output edges
-                # We could potentially only need one set of edges for
-                # this version
-                worst_case = D + 2*k
-            else:
-                # For the strict algorithm, if we are processing n
-                # points at a time, we need the point locations of all
-                # of their neigbhors, thus in the worst case, we need
-                # n + n*k point locations and rows of the edge matrix.
-                # the 2*k again represents the need for two versions of
-                # the edge matrix. Here, we definitely need an input and
-                # an output array
-                worst_case = (D + 2*k) * (k + 1)
-
-            # If we are using the discrete algorithm, remember we need
-            # to add the template's storage as well to the GPU
-            if self.discrete_steps > 0:
-                available_gpu_memory -= self.discrete_steps*bytes_per_number
-
-            divisor = bytes_per_number * worst_case
-
-            self.query_size = min(available_gpu_memory // divisor, N)
-
-        self.query_size = int(self.query_size)
+            self.query_size = self.compute_query_size()
 
         self.chunked = self.X.shape[0] > self.query_size
 
@@ -140,121 +94,35 @@ class Graph(object):
         self.worker_thread.daemon = True
         self.worker_thread.start()
 
+    @abc.abstractmethod
+    def compute_query_size(self):
+        pass
+
+    @abc.abstractmethod
+    def collect_additional_indices(self, edges, indices):
+        pass
+
+    @abc.abstractmethod
+    def prune(self, X, edges, indices=None, count=None):
+        pass
+
     def populate_chunk(self, start_index):
         end_index = min(start_index+self.query_size, self.X.shape[0])
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
 
-        start = time.time()
-
         distances, edges = self.nn_index.search(working_set,
                                                 self.max_neighbors)
 
-        end = time.time()
-        print('Initial KNN retrieval: {} s'.format(end-start))
-        sys.stdout.flush()
-        start = time.time()
-
-        indices = working_set
-        # We will need the locations of these additional points since
-        # we need to know if they fall into the empty region of any
-        # edges above
-        additional_indices = np.setdiff1d(edges.ravel(),
-                                          working_set)
-
-        end = time.time()
-        print('Calculating additional indices: {} s'.format(end-start))
-        sys.stdout.flush()
-        start = time.time()
-
-        if additional_indices.shape[0] > 0:
-            # It is possible that we cannot store the entirety of X
-            # and edges on the GPU, so figure out the subset of Xs and
-            # carefully replace the edges values
-            indices = np.hstack((working_set, additional_indices))
-
-            end = time.time()
-            print('Stacking indices: {} s'.format(end-start))
-            sys.stdout.flush()
-            start = time.time()
-
-            if not self.relaxed:
-                neighbor_edges = self.nn_index.search(additional_indices,
-                                                      self.max_neighbors,
-                                                      False)
-
-                end = time.time()
-                print('Secondary knn query: {} s'.format(end-start))
-                sys.stdout.flush()
-                start = time.time()
-                # We don't care about whether any of the edges of these
-                # extra rows are valid yet, but the algorithm will need
-                # them to prune correctly
-                edges = np.vstack((edges, neighbor_edges))
-
-                end = time.time()
-                print('Stacking edges: {} s'.format(end-start))
-                sys.stdout.flush()
-                start = time.time()
-
-                # Since we will be using the edges above for queries, we
-                # need to make sure we have the locations of everything
-                # they touch
-                neighbor_indices = np.setdiff1d(neighbor_edges.ravel(),
-                                                indices)
-
-                end = time.time()
-                print('Calculating neighbor indices: {} s'.format(end-start))
-                sys.stdout.flush()
-                start = time.time()
-
-                if neighbor_indices.shape[0] > 0:
-                    indices = np.hstack((indices, neighbor_indices))
-
-                end = time.time()
-                print('Stacking neighboring indices: {} s'.format(end-start))
-                sys.stdout.flush()
-                start = time.time()
-
-
-        indices = indices.astype(i32)
+        indices = self.collect_additional_indices(edges, working_set)
         X = self.X[indices, :]
 
-        end = time.time()
-        print('Retyping indices and subsetting X: {} s'.format(end-start))
-        sys.stdout.flush()
-        print(X.shape)
-        print('\tMemory Available before: {}'.format(ngl.get_available_device_memory()))
-        sys.stdout.flush()
-        print(psutil.virtual_memory())
-        start = time.time()
-
-        edges = ngl.prune(X,
-                          edges,
-                          indices=indices,
-                          relaxed=self.relaxed,
-                          steps=self.discrete_steps,
-                          beta=self.beta,
-                          lp=self.p,
-                          count=count)
-
-        end = time.time()
-        print('Actual Pruning: {} s'.format(end-start))
-        sys.stdout.flush()
-        print('\tMemory Available after: {}'.format(ngl.get_available_device_memory()))
-        sys.stdout.flush()
-        print(psutil.virtual_memory())
-        start = time.time()
+        edges = self.prune(self.X, edges, indices, count)
 
         # We will cache these for later use
         if self.cached:
             self.edges[start_index:end_index, :] = edges[:count]
             self.distances[start_index:end_index, :] = distances[:count]
-
-            end = time.time()
-            print('Caching: {} s'.format(end-start))
-            sys.stdout.flush()
-            start = time.time()
 
         # Since, we are taking a lot of time to generate these, then we
         # should give the user something to process in the meantime, so
@@ -262,23 +130,13 @@ class Graph(object):
         # populate before the same process is done again.
         self.push_edges(edges[:count], distances[:count], indices[:count])
 
-        end = time.time()
-        print('Updating edge queue: {} s'.format(end-start))
-        sys.stdout.flush()
-        start = time.time()
-
     def populate_whole(self):
         count = self.X.shape[0]
         working_set = np.array(range(count))
         distances, edges = self.nn_index.search(working_set,
                                                 self.max_neighbors)
 
-        edges = ngl.prune(self.X,
-                          edges,
-                          relaxed=self.relaxed,
-                          steps=self.discrete_steps,
-                          beta=self.beta,
-                          lp=self.p)
+        self.prune(self.X, edges)
 
         if self.cached:
             self.edges = edges
