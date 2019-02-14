@@ -127,10 +127,10 @@ class Graph(object):
 
         self.chunked = self.X.shape[0] > self.query_size
 
-        print('Problem Size: {}'.format(N))
-        print('  Query Size: {}'.format(self.query_size))
-        print('  GPU Memory: {}'.format(available_gpu_memory))
-        print('     Chunked: {}'.format(self.chunked))
+        # print('Problem Size: {}'.format(N))
+        # print('  Query Size: {}'.format(self.query_size))
+        # print('  GPU Memory: {}'.format(available_gpu_memory))
+        # print('     Chunked: {}'.format(self.chunked))
         sys.stdout.flush()
 
         self.edge_list = Queue(self.query_size*10)
