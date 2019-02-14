@@ -6,6 +6,7 @@ import nglpy_cuda as ngl
 import math
 import samply
 import numpy as np
+from sklearn import neighbors
 
 
 class TestConics(unittest.TestCase):
@@ -44,7 +45,9 @@ class TestConics(unittest.TestCase):
 
         self.points = np.vstack((self.points, vectors, rotated_vectors))
 
-        self.max_neighbors = len(self.points)
+        nn = neighbors.NearestNeighbors(n_neighbors=len(self.points))
+        nn.fit(self.points)
+        self.indices = nn.kneighbors(self.points, return_distance=False)
         self.k = count
         self.d = dim
 
@@ -52,19 +55,11 @@ class TestConics(unittest.TestCase):
         """ Test the Θ-Graph
         """
         self.setup()
-        edges = ngl.theta_graph(
-            self.points, self.d, self.k, self.max_neighbors
-        )
+        indices = ngl.theta_graph(self.points, self.d, self.k, self.indices)[0]
 
-        expected = set()
-        for k in range(1, self.k+1):
-            expected.add((0, k))
+        expected = set(range(1, self.k+1))
+        actual = set(indices[indices != -1])
 
-        actual = set()
-        for e in edges:
-            if 0 in e[:2]:
-                if e not in expected:
-                    actual.add(e[:2])
         msg = "\nNode {} Connectivity:".format(0)
         msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
         self.assertEqual(expected, actual, msg)
@@ -73,17 +68,11 @@ class TestConics(unittest.TestCase):
         """ Test the Yao Graph
         """
         self.setup()
-        edges = ngl.yao_graph(self.points, self.d, self.k, self.max_neighbors)
+        indices = ngl.yao_graph(self.points, self.d, self.k, self.indices)[0]
 
-        expected = set()
-        for k in range(1, self.k+1):
-            expected.add((0, len(self.points) - k))
+        expected = set(range(len(self.points)-1, self.k, -1))
+        actual = set(indices[indices != -1])
 
-        actual = set()
-        for e in edges:
-            if 0 in e[:2]:
-                if e not in expected:
-                    actual.add(e[:2])
         msg = "\nNode {} Connectivity:".format(0)
         msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
         self.assertEqual(expected, actual, msg)
