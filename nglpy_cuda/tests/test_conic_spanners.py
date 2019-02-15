@@ -55,7 +55,7 @@ class TestConics(unittest.TestCase):
         """ Test the Θ-Graph
         """
         self.setup()
-        indices = ngl.theta_graph(self.points, self.d, self.k, self.indices)[0]
+        indices = ngl.theta_graph(self.points, self.k, 1, self.indices)[0]
 
         expected = set(range(1, self.k+1))
         actual = set(indices[indices != -1])
@@ -68,7 +68,7 @@ class TestConics(unittest.TestCase):
         """ Test the Yao Graph
         """
         self.setup()
-        indices = ngl.yao_graph(self.points, self.d, self.k, self.indices)[0]
+        indices = ngl.yao_graph(self.points, self.k, 1, self.indices)[0]
 
         expected = set(range(len(self.points)-1, self.k, -1))
         actual = set(indices[indices != -1])
@@ -76,6 +76,57 @@ class TestConics(unittest.TestCase):
         msg = "\nNode {} Connectivity:".format(0)
         msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
         self.assertEqual(expected, actual, msg)
+
+    def test_ConeGraph_yao(self):
+        """
+        """
+        self.setup()
+
+        go = ngl.ConeGraph(num_sectors=self.k, algorithm="yao")
+        go.build(self.points)
+
+        expected = set(range(len(self.points)-1, self.k, -1))
+        actual = set()
+        for (a, b, distance) in go:
+            if a == 0:
+                actual.add(b)
+            elif b == 0:
+                actual.add(a)
+
+        msg = "\nNode {} Connectivity:".format(0)
+        msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
+        self.assertEqual(expected, actual, msg)
+
+    def test_ConeGraph_theta(self):
+        """
+        """
+        self.setup()
+
+        go = ngl.ConeGraph(num_sectors=self.k, algorithm="theta")
+        go.build(self.points)
+
+        expected = set(range(1, self.k+1))
+        actual = set()
+        for (a, b, distance) in go:
+            if a == 0:
+                actual.add(b)
+            elif b == 0:
+                actual.add(a)
+
+        msg = "\nNode {} Connectivity:".format(0)
+        msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
+        self.assertEqual(expected, actual, msg)
+
+    def test_ConeGraph_invalid(self):
+        """
+        """
+        self.setup()
+
+        try:
+            ngl.ConeGraph(num_sectors=self.k, algorithm="invalid")
+            self.assertEqual(True, False, "A ValueError should be raised.")
+        except ValueError as err:
+            self.assertTrue(str(err).startswith("Unknown algorithm specified"))
 
 
 if __name__ == "__main__":
