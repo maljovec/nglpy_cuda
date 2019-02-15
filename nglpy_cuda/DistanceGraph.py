@@ -71,5 +71,5 @@ class DistanceGraph(Graph):
     def collect_additional_indices(self, edges, indices):
         return indices
 
-    def prune(self, X, edges, indices=None, count=None):
+    def prune(self, X, edges, indices=None):
         return edges

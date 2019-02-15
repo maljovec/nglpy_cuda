@@ -4,7 +4,6 @@
 import nglpy_cuda as ngl
 from .Graph import Graph
 
-
 class ConeGraph(Graph):
     """ A neighborhood graph that represents the connectivity of a given
     data matrix.
@@ -12,6 +11,7 @@ class ConeGraph(Graph):
     Attributes:
         None
     """
+    available_algorithms = ["yao", "theta"]
 
     def __init__(self,
                  index=None,
@@ -54,17 +54,23 @@ class ConeGraph(Graph):
 
         self.num_sectors = num_sectors
         self.points_per_sector = points_per_sector
-        self.algorithm = algorithm
+        self.algorithm = algorithm.strip().lower()
+        if self.algorithm not in ConeGraph.available_algorithms:
+            raise ValueError("Unknown algorithm specified: {}. Must be one of {}".format(
+                self.algorithm, ConeGraph.available_algorithms))
 
     def compute_query_size(self):
         """
         """
         if self.query_size is not None:
             return self.query_size
-        return self.query_size
+        return 1000000
 
     def collect_additional_indices(self, edges, indices):
         return indices
 
-    def prune(self, X, edges, indices=None, count=None):
-        return edges
+    def prune(self, X, edges, indices=None):
+        if self.algorithm == "yao":
+            return ngl.yao_graph(X, self.num_sectors, self.points_per_sector, edges)
+        elif self.algorithm == "theta":
+            return ngl.theta_graph(X, self.num_sectors, self.points_per_sector, edges)

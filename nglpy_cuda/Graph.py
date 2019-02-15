@@ -31,7 +31,7 @@ class Graph(ABC):
                  index=None,
                  max_neighbors=-1,
                  query_size=None,
-                 cached=True):
+                 cached=False):
         """Initialization of the graph object. This will convert all of
         the passed in parameters into parameters the C++ implementation
         of NGL can understand and then issue an external call to that
@@ -103,7 +103,7 @@ class Graph(ABC):
         pass
 
     @abc.abstractmethod
-    def prune(self, X, edges, indices=None, count=None):
+    def prune(self, X, edges, indices=None):
         pass
 
     def populate_chunk(self, start_index):
@@ -117,7 +117,7 @@ class Graph(ABC):
         indices = self.collect_additional_indices(edges, working_set)
         X = self.X[indices, :]
 
-        edges = self.prune(self.X, edges, indices, count)
+        edges = self.prune(self.X, edges, indices)
 
         # We will cache these for later use
         if self.cached:
@@ -136,7 +136,7 @@ class Graph(ABC):
         distances, edges = self.nn_index.search(working_set,
                                                 self.max_neighbors)
 
-        self.prune(self.X, edges)
+        edges = self.prune(self.X, edges)
 
         if self.cached:
             self.edges = edges

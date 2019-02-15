@@ -177,7 +177,7 @@ class EmptyRegionGraph(Graph):
         indices = indices.astype(i32)
         return indices
 
-    def prune(self, X, edges, indices=None, count=None):
+    def prune(self, X, edges, indices=None):
         if indices is None:
             edges = ngl.prune(X,
                             edges,
