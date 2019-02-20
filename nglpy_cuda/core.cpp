@@ -150,6 +150,56 @@ static PyObject* nglpy_cuda_core_prune(PyObject *self, PyObject *args, PyObject*
     return PyArray_Return(edges_arr);
 }
 
+static PyObject* nglpy_cuda_core_prune_yao(PyObject *self, PyObject *args, PyObject* kwargs) {
+    int N;
+    int D;
+    int M;
+    int K;
+    int num_sectors;
+    int points_per_sector = 1;
+    int count = -1;
+    PyArrayObject *X_arr;
+    PyArrayObject *vectors_arr;
+    PyArrayObject *edges_arr;
+    PyArrayObject *indices_arr = NULL;
+
+    static char* argnames[] = {"X", "bisectors", "edges", "indices", "count", "points_per_sector", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&O&|O&ii", argnames,
+                                     PyArray_Converter, &X_arr,
+                                     PyArray_Converter, &vectors_arr,
+                                     PyArray_Converter, &edges_arr,
+                                     PyArray_Converter, &indices_arr,
+                                     &count,
+                                     &points_per_sector))
+        return NULL;
+
+    npy_intp idx[2];
+    idx[0] = idx[1] = 0;
+    float *X = (float *)PyArray_GetPtr(X_arr, idx);
+    float *vectors = (float *)PyArray_GetPtr(vectors_arr, idx);
+    int *edges = (int *)PyArray_GetPtr(edges_arr, idx);
+    int *indices = NULL;
+    if (indices_arr != NULL) {
+        indices = (int *)PyArray_GetPtr(indices_arr, idx);
+    }
+
+    N = PyArray_DIM(X_arr, 0);
+    if (count < 0) {
+        count = N;
+    }
+    D = PyArray_DIM(X_arr, 1);
+    M = PyArray_DIM(edges_arr, 0);
+    K = PyArray_DIM(edges_arr, 1);
+    num_sectors = PyArray_DIM(vectors_arr, 0);
+
+    nglcu::prune_yao(X, vectors, edges, indices, N, D, M, K, num_sectors, points_per_sector, count);
+
+    Py_DECREF(X_arr);
+    Py_DECREF(vectors_arr);
+
+    return PyArray_Return(edges_arr);
+}
+
 static PyObject* nglpy_cuda_core_probability(PyObject *self, PyObject *args, PyObject* kwargs) {
     //import_array();
     int N;
@@ -223,6 +273,7 @@ static PyMethodDef nglpy_cuda_core_methods[] = {
     {"create_template",(PyCFunction)nglpy_cuda_core_create_template, METH_VARARGS, ""},
     {"min_distance_from_edge",(PyCFunction)nglpy_cuda_core_min_distance_from_edge, METH_VARARGS, ""},
     {"prune",(PyCFunction)nglpy_cuda_core_prune, METH_VARARGS|METH_KEYWORDS, ""},
+    {"prune_yao",(PyCFunction)nglpy_cuda_core_prune_yao, METH_VARARGS|METH_KEYWORDS, ""},
     {"associate_probability",(PyCFunction)nglpy_cuda_core_probability, METH_VARARGS|METH_KEYWORDS, ""},
     {"get_available_device_memory",(PyCFunction)nglpy_cuda_core_get_available_memory, METH_NOARGS, ""},
     {NULL, NULL, 0, NULL}

@@ -15,6 +15,9 @@ namespace nglcu{
                         float lp=2, int count=-1);
     void prune(float *X, int *edges, int *indices, int N, int D, int M, int K,
                bool relaxed=false, float beta=1, float lp=2, int count=-1);
+    void prune_yao(float *X, float *bisectors, int *edges, int *indices, int N,
+                   int D, int M, int K, int numSectors, int numPointsPerSector,
+                   int count);
     void print_cuda_info();
     size_t get_available_device_memory();
 }

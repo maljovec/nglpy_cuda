@@ -27,7 +27,8 @@ class TestConics(unittest.TestCase):
         # points exactly on the conic axes
         count = 6
         dim = 2
-        vectors = samply.SCVTSampler.generate_samples(count, dim, seed=0)
+        np.random.seed(0)
+        vectors = samply.directional.cvt(count, dim)
 
         # Now take those same vectors, rotate them by one quarter of the
         # bisecting angle of each conic section to ensure they still lie
@@ -55,6 +56,7 @@ class TestConics(unittest.TestCase):
         """ Test the Θ-Graph
         """
         self.setup()
+        np.random.seed(0)
         indices = ngl.theta_graph(self.points, self.k, 1, self.indices)[0]
 
         expected = set(range(1, self.k+1))
@@ -68,6 +70,7 @@ class TestConics(unittest.TestCase):
         """ Test the Yao Graph
         """
         self.setup()
+        np.random.seed(0)
         indices = ngl.yao_graph(self.points, self.k, 1, self.indices)[0]
 
         expected = set(range(len(self.points)-1, self.k, -1))
@@ -81,8 +84,8 @@ class TestConics(unittest.TestCase):
         """
         """
         self.setup()
-
         go = ngl.ConeGraph(num_sectors=self.k, algorithm="yao")
+        np.random.seed(0)
         go.build(self.points)
 
         expected = set(range(len(self.points)-1, self.k, -1))
@@ -97,13 +100,42 @@ class TestConics(unittest.TestCase):
         msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
         self.assertEqual(expected, actual, msg)
 
+        # go = ngl.ConeGraph(num_sectors=self.k, algorithm="yao", query_size=2)
+        # np.random.seed(0)
+        # go.build(self.points)
+        # actual = set()
+        # for (a, b, distance) in go:
+        #     if a == 0:
+        #         actual.add(b)
+        #     elif b == 0:
+        #         actual.add(a)
+
+        # msg = "\nNode {} Connectivity:".format(0)
+        # msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
+        # self.assertEqual(expected, actual, msg)
+
     def test_ConeGraph_theta(self):
         """
         """
         self.setup()
 
         go = ngl.ConeGraph(num_sectors=self.k, algorithm="theta")
+        print(self.points[1:7])
+        np.random.seed(0)
         go.build(self.points)
+
+        import matplotlib.pyplot as plt
+        from matplotlib.collections import LineCollection
+
+        lines = []
+        for pt in self.points[1:]:
+            lines.append([self.points[0], pt])
+
+        plt.scatter(self.points[:,0], self.points[:, 1])
+        for i in range(len(self.points)):
+            plt.annotate(str(i), self.points[i])
+        plt.gca().add_collection(LineCollection(lines))
+        # plt.show()
 
         expected = set(range(1, self.k+1))
         actual = set()

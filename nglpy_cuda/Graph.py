@@ -103,7 +103,7 @@ class Graph(ABC):
         pass
 
     @abc.abstractmethod
-    def prune(self, X, edges, indices=None):
+    def prune(self, X, edges, indices=None, count=None):
         pass
 
     def populate_chunk(self, start_index):
@@ -117,7 +117,7 @@ class Graph(ABC):
         indices = self.collect_additional_indices(edges, working_set)
         X = self.X[indices, :]
 
-        edges = self.prune(self.X, edges, indices)
+        edges = self.prune(self.X, edges, indices, count)
 
         # We will cache these for later use
         if self.cached:

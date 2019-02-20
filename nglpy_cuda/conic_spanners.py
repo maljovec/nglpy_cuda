@@ -6,7 +6,7 @@ from .utils import f32, i32
 
 def yao_graph(X, num_sectors, points_per_sector, indices):
     D = X.shape[1]
-    vectors = samply.SCVTSampler.generate_samples(num_sectors, D)
+    vectors = samply.directional.cvt(num_sectors, D)
     indices_out = -1*np.ones(indices.shape, dtype=i32)
 
     for i in range(X.shape[0]):
@@ -26,7 +26,7 @@ def yao_graph(X, num_sectors, points_per_sector, indices):
 
 def theta_graph(X, num_sectors, points_per_sector, indices):
     D = X.shape[1]
-    vectors = samply.SCVTSampler.generate_samples(num_sectors, D)
+    vectors = samply.directional.cvt(num_sectors, D)
     indices_out = -1*np.ones(indices.shape, dtype=i32)
 
     for i in range(X.shape[0]):

@@ -3,6 +3,10 @@
 """
 import nglpy_cuda as ngl
 from .Graph import Graph
+from .utils import f32, i32
+import samply
+import numpy as np
+
 
 class ConeGraph(Graph):
     """ A neighborhood graph that represents the connectivity of a given
@@ -69,8 +73,17 @@ class ConeGraph(Graph):
     def collect_additional_indices(self, edges, indices):
         return indices
 
-    def prune(self, X, edges, indices=None):
+    def prune(self, X, edges, indices=None, count=None):
         if self.algorithm == "yao":
-            return ngl.yao_graph(X, self.num_sectors, self.points_per_sector, edges)
+            # Move this code up once the theta graph is on the gpu
+            D = X.shape[1]
+            vectors = samply.directional.cvt(self.num_sectors, D)
+            vectors = np.array(vectors, dtype=f32)
+            #####
+            if indices is None:
+                edges = ngl.prune_yao(X, vectors, edges, points_per_sector=self.points_per_sector)
+            else:
+                edges = ngl.prune_yao(X, vectors, edges, indices, count, self.points_per_sector)
+            return edges
         elif self.algorithm == "theta":
             return ngl.theta_graph(X, self.num_sectors, self.points_per_sector, edges)
