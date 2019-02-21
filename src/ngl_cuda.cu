@@ -953,8 +953,6 @@ namespace nglcu {
             }
 
             std::cout << "(" << get_available_device_memory() - max_index*sizeof(int) << "): " << std::flush;
-            // std::cout << "Max index: " << max_index << std::endl;
-            // std::cout << "N: " << N << std::endl;
             cudaMallocManaged(&map_d, max_index*sizeof(int));
             for(i = 0; i < N; i++) {
                 map_d[indices[i]] = i;

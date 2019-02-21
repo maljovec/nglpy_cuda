@@ -71,6 +71,46 @@ class TestGraph(unittest.TestCase):
 
         self.assertSetEqual(self.gold_strict, test)
 
+    def test_strict_chunked(self):
+        """
+        Test Graph's ability to build knn and prune correctly in the
+        strict case for both discrete and continuous algorithms.
+        """
+        self.setup()
+        graph = ngl.EmptyRegionGraph(
+            index=None,
+            max_neighbors=-1,
+            relaxed=False,
+            beta=1,
+            p=2.0,
+            discrete_steps=-1,
+            query_size=2,
+            cached=False
+        )
+        graph.build(self.points)
+
+        test = set()
+        for e1, e2, d in graph:
+            test.add((min(e1, e2), max(e1, e2)))
+
+        self.assertSetEqual(self.gold_strict, test)
+
+        graph = ngl.EmptyRegionGraph(
+            index=None,
+            max_neighbors=-1,
+            relaxed=False,
+            beta=1,
+            p=2.0,
+            discrete_steps=100,
+            query_size=2
+        )
+        graph.build(self.points)
+        test = set()
+        for e1, e2, d in graph:
+            test.add((min(e1, e2), max(e1, e2)))
+
+        self.assertSetEqual(self.gold_strict, test)
+
     def test_relaxed(self):
         """
         Test Graph's ability to build knn and prune correctly in the
@@ -99,6 +139,46 @@ class TestGraph(unittest.TestCase):
             beta=1,
             p=2.0,
             discrete_steps=100,
+        )
+
+        graph.build(self.points)
+        test = set()
+        for e1, e2, d in graph:
+            test.add((min(e1, e2), max(e1, e2)))
+
+        self.assertSetEqual(self.gold_relaxed, test)
+
+    def test_relaxed_chunked(self):
+        """
+        Test Graph's ability to build knn and prune correctly in the
+        strict case for both discrete and continuous algorithms.
+        """
+        self.setup()
+        graph = ngl.EmptyRegionGraph(
+            index=None,
+            max_neighbors=-1,
+            relaxed=True,
+            beta=1,
+            p=2.0,
+            discrete_steps=-1,
+            query_size=2,
+            cached=False
+        )
+        graph.build(self.points)
+        test = set()
+        for e1, e2, d in graph:
+            test.add((min(e1, e2), max(e1, e2)))
+
+        self.assertSetEqual(self.gold_relaxed, test)
+
+        graph = ngl.EmptyRegionGraph(
+            index=None,
+            max_neighbors=-1,
+            relaxed=True,
+            beta=1,
+            p=2.0,
+            discrete_steps=100,
+            query_size=2
         )
 
         graph.build(self.points)

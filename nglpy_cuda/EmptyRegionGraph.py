@@ -18,6 +18,7 @@ if sys.version_info.major >= 3:
 else:
     from Queue import Queue, Empty
 
+
 class EmptyRegionGraph(Graph):
     """ A neighborhood graph that represents the connectivity of a given
     data matrix.
@@ -180,18 +181,18 @@ class EmptyRegionGraph(Graph):
     def prune(self, X, edges, indices=None, count=None):
         if indices is None:
             edges = ngl.prune(X,
-                            edges,
-                            relaxed=self.relaxed,
-                            steps=self.discrete_steps,
-                            beta=self.beta,
-                            lp=self.p)
+                              edges,
+                              relaxed=self.relaxed,
+                              steps=self.discrete_steps,
+                              beta=self.beta,
+                              lp=self.p)
         else:
             edges = ngl.prune(X,
-                    edges,
-                    indices=indices,
-                    relaxed=self.relaxed,
-                    steps=self.discrete_steps,
-                    beta=self.beta,
-                    lp=self.p,
-                    count=count)
+                              edges,
+                              indices=indices,
+                              relaxed=self.relaxed,
+                              steps=self.discrete_steps,
+                              beta=self.beta,
+                              lp=self.p,
+                              count=count)
         return edges

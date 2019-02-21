@@ -117,7 +117,7 @@ class Graph(ABC):
         indices = self.collect_additional_indices(edges, working_set)
         X = self.X[indices, :]
 
-        edges = self.prune(self.X, edges, indices, count)
+        edges = self.prune(X, edges, indices, count)
 
         # We will cache these for later use
         if self.cached:

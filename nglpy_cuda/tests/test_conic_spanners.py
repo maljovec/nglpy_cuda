@@ -100,19 +100,25 @@ class TestConics(unittest.TestCase):
         msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
         self.assertEqual(expected, actual, msg)
 
-        # go = ngl.ConeGraph(num_sectors=self.k, algorithm="yao", query_size=2)
-        # np.random.seed(0)
-        # go.build(self.points)
-        # actual = set()
-        # for (a, b, distance) in go:
-        #     if a == 0:
-        #         actual.add(b)
-        #     elif b == 0:
-        #         actual.add(a)
+    def test_ConeGraph_yao_chunked(self):
+        """
+        """
+        self.setup()
+        go = ngl.ConeGraph(num_sectors=self.k, algorithm="yao", query_size=2)
+        np.random.seed(0)
+        go.build(self.points)
 
-        # msg = "\nNode {} Connectivity:".format(0)
-        # msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
-        # self.assertEqual(expected, actual, msg)
+        expected = set(range(len(self.points)-1, self.k, -1))
+        actual = set()
+        for (a, b, distance) in go:
+            if a == 0:
+                actual.add(b)
+            elif b == 0:
+                actual.add(a)
+
+        msg = "\nNode {} Connectivity:".format(0)
+        msg += "\n\texpected: {}\n\tactual: {} ".format(expected, actual)
+        self.assertEqual(expected, actual, msg)
 
     def test_ConeGraph_theta(self):
         """
@@ -120,22 +126,8 @@ class TestConics(unittest.TestCase):
         self.setup()
 
         go = ngl.ConeGraph(num_sectors=self.k, algorithm="theta")
-        print(self.points[1:7])
         np.random.seed(0)
         go.build(self.points)
-
-        import matplotlib.pyplot as plt
-        from matplotlib.collections import LineCollection
-
-        lines = []
-        for pt in self.points[1:]:
-            lines.append([self.points[0], pt])
-
-        plt.scatter(self.points[:,0], self.points[:, 1])
-        for i in range(len(self.points)):
-            plt.annotate(str(i), self.points[i])
-        plt.gca().add_collection(LineCollection(lines))
-        # plt.show()
 
         expected = set(range(1, self.k+1))
         actual = set()

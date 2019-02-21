@@ -24,7 +24,7 @@ class ConeGraph(Graph):
                  points_per_sector=1,
                  algorithm="yao",
                  query_size=None,
-                 cached=True):
+                 cached=False):
         """Initialization of the graph object. This will convert all of
         the passed in parameters into parameters the C++ implementation
         of NGL can understand and then issue an external call to that
@@ -71,6 +71,7 @@ class ConeGraph(Graph):
         return 1000000
 
     def collect_additional_indices(self, edges, indices):
+        indices = indices.astype(i32)
         return indices
 
     def prune(self, X, edges, indices=None, count=None):
