@@ -115,17 +115,11 @@ class EmptyRegionGraph(Graph):
         return self.query_size
 
     def collect_additional_indices(self, edges, indices):
-        start = time.time()
         # We will need the locations of these additional points since
         # we need to know if they fall into the empty region of any
         # edges above
         additional_indices = np.setdiff1d(edges.ravel(),
                                           indices)
-
-        end = time.time()
-        print('Calculating additional indices: {} s'.format(end-start))
-        sys.stdout.flush()
-        start = time.time()
 
         if additional_indices.shape[0] > 0:
             # It is possible that we cannot store the entirety of X
@@ -133,28 +127,14 @@ class EmptyRegionGraph(Graph):
             # carefully replace the edges values
             indices = np.hstack((indices, additional_indices))
 
-            end = time.time()
-            print('Stacking indices: {} s'.format(end-start))
-            sys.stdout.flush()
-            start = time.time()
-
             if not self.relaxed:
                 neighbor_edges = self.nn_index.search(additional_indices,
                                                       self.max_neighbors,
                                                       False)
-                end = time.time()
-                print('Secondary knn query: {} s'.format(end-start))
-                sys.stdout.flush()
-                start = time.time()
                 # We don't care about whether any of the edges of these
                 # extra rows are valid yet, but the algorithm will need
                 # them to prune correctly
                 edges = np.vstack((edges, neighbor_edges))
-
-                end = time.time()
-                print('Stacking edges: {} s'.format(end-start))
-                sys.stdout.flush()
-                start = time.time()
 
                 # Since we will be using the edges above for queries, we
                 # need to make sure we have the locations of everything
@@ -162,20 +142,9 @@ class EmptyRegionGraph(Graph):
                 neighbor_indices = np.setdiff1d(neighbor_edges.ravel(),
                                                 indices)
 
-                end = time.time()
-                print('Calculating neighbor indices: {} s'.format(end-start))
-                sys.stdout.flush()
-                start = time.time()
-
                 if neighbor_indices.shape[0] > 0:
                     indices = np.hstack((indices, neighbor_indices))
 
-                end = time.time()
-                print('Stacking neighboring indices: {} s'.format(end-start))
-                sys.stdout.flush()
-                start = time.time()
-
-        indices = indices.astype(i32)
         return indices
 
     def prune(self, X, edges, indices=None, count=None):

@@ -71,7 +71,18 @@ class ConeGraph(Graph):
         return 1000000
 
     def collect_additional_indices(self, edges, indices):
-        indices = indices.astype(i32)
+        # We will need the locations of these additional points since
+        # we need to know if they fall into the empty region of any
+        # edges above
+        additional_indices = np.setdiff1d(edges.ravel(),
+                                          indices)
+
+        if additional_indices.shape[0] > 0:
+            # It is possible that we cannot store the entirety of X
+            # and edges on the GPU, so figure out the subset of Xs and
+            # carefully replace the edges values
+            indices = np.hstack((indices, additional_indices))
+
         return indices
 
     def prune(self, X, edges, indices=None, count=None):

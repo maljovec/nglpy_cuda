@@ -2,8 +2,6 @@
 #include "utils.cuh"
 #include <cstdio>
 #include <map>
-#include <chrono>
-#include <iostream>
 
 namespace nglcu {
 
@@ -194,6 +192,8 @@ namespace nglcu {
 
         float *p, *q, *r;
 
+        // TODO: Do not hard-code these vector sizes, or make it large
+        // enough to hold all reasonable problem sizes
         float pq[10] = {};
         float pr[10] = {};
 
@@ -288,6 +288,8 @@ namespace nglcu {
 
         float *p, *q, *r;
 
+        // TODO: Do not hard-code these vector sizes, or make it large
+        // enough to hold all reasonable problem sizes
         float pq[10] = {};
         float pr[10] = {};
 
@@ -391,6 +393,8 @@ namespace nglcu {
 
         float *p, *q, *r;
 
+        // TODO: Do not hard-code these vector sizes, or make it large
+        // enough to hold all reasonable problem sizes
         float pq[10] = {};
         float pr[10] = {};
 
@@ -497,6 +501,8 @@ namespace nglcu {
 
         float *p, *q, *r;
 
+        // TODO: Do not hard-code these vector sizes, or make it large
+        // enough to hold all reasonable problem sizes
         float pq[10] = {};
         float pr[10] = {};
 
@@ -644,17 +650,18 @@ namespace nglcu {
         if (indices != NULL) {
             int *map_d;
             int i;
-            int max_idx = 0;
-            for(i = 0; i < count; i++) {
-                max_idx = indices[i] > max_idx ? indices[i] : max_idx;
+            int max_index = 0;
+            for(i = 0; i < N; i++) {
+                max_index = indices[i] > max_index ? indices[i] : max_index;
             }
 
-            cudaMallocManaged(&map_d, max_idx*sizeof(int));
-            for(i = 0; i < count; i++) {
+            cudaMallocManaged(&map_d, max_index*sizeof(int));
+            for(i = 0; i < N; i++) {
                 map_d[indices[i]] = i;
             }
+
             map_indices(edgesIn_d, map_d, M, K);
-            map_indices(edgesOut_d, map_d, M, K);
+            map_indices(edgesOut_d, map_d, count, K);
             cudaFree(map_d);
         }
 
@@ -698,7 +705,7 @@ namespace nglcu {
         cudaDeviceSynchronize();
 
         if (indices != NULL) {
-            unmap_indices(edgesOut_d, indices, M, K, count);
+            unmap_indices(edgesOut_d, indices, count, K, N);
         }
 
         memcpy(edges, edgesOut_d, count*K*sizeof(int));
@@ -719,72 +726,32 @@ namespace nglcu {
             count = N;
         }
 
-        auto start = std::chrono::high_resolution_clock::now();
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << "\t" << "Memory allocation for edges (" << get_available_device_memory() - M*K*sizeof(int) - count*K*sizeof(int) << "): " << std::flush;
-
-        cudaMallocManaged(&edgesIn_d, M*K*sizeof(int));
+        cudaErrchk(cudaMallocManaged(&edgesIn_d, M*K*sizeof(int)));
         memcpy(edgesIn_d, edges, M*K*sizeof(int));
 
-        cudaMallocManaged(&edgesOut_d, count*K*sizeof(int));
+        cudaErrchk(cudaMallocManaged(&edgesOut_d, count*K*sizeof(int)));
         memcpy(edgesOut_d, edges, count*K*sizeof(int));
-
-        end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Memory allocation for index map " << std::flush;
 
         if (indices != NULL) {
             int *map_d;
             int i;
-
             int max_index = 0;
             for(i = 0; i < N; i++) {
-                if (indices[i] > max_index) {
-                    max_index = indices[i];
-                }
+                max_index = indices[i] > max_index ? indices[i] : max_index;
             }
 
-            std::cout << "(" << get_available_device_memory() - max_index*sizeof(int) << "): " << std::flush;
             cudaMallocManaged(&map_d, max_index*sizeof(int));
             for(i = 0; i < N; i++) {
                 map_d[indices[i]] = i;
             }
 
-            end = std::chrono::high_resolution_clock::now();
-	        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-            start = std::chrono::high_resolution_clock::now();
-	        std::cout << "\t" << "Mapping indices for edgesIn: " << std::flush;
-
             map_indices(edgesIn_d, map_d, M, K);
-
-            end = std::chrono::high_resolution_clock::now();
-	        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-            start = std::chrono::high_resolution_clock::now();
-	        std::cout << "\t" << "Mapping indices for edgesOut: " << std::flush;
-
             map_indices(edgesOut_d, map_d, count, K);
-
-            end = std::chrono::high_resolution_clock::now();
-	        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-            start = std::chrono::high_resolution_clock::now();
-	        std::cout << "\t" << "Freeing map index: " << std::flush;
-
             cudaFree(map_d);
         }
 
-        end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Memory allocation for X (" << get_available_device_memory() - N*D*sizeof(float) << "): " << std::flush;
-
-        cudaMallocManaged(&x_d, N*D*sizeof(float));
+        cudaErrchk(cudaMallocManaged(&x_d, N*D*sizeof(float)));
         memcpy(x_d, X, N*D*sizeof(float));
-
-        end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Device call: " << std::flush;
 
         if (relaxed) {
             prune_relaxed_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, count, D, K, lp, beta, edgesOut_d);
@@ -798,33 +765,15 @@ namespace nglcu {
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
 
-        end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-
         if (indices != NULL) {
             unmap_indices(edgesOut_d, indices, count, K, N);
         }
 
-        end = std::chrono::high_resolution_clock::now();
-        std::cout << "\t" << "Unmap indices: " << std::flush;
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Copying back: " << std::flush;
-
         memcpy(edges, edgesOut_d, count*K*sizeof(int));
-
-        end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Free remaining memory: " << std::flush;
 
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
-
-	    end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
     }
 
     __global__
@@ -849,6 +798,9 @@ namespace nglcu {
         int i, j, k, d;
 
         float *p, *q;
+
+        // TODO: Do not hard-code this vector size, or make it large
+        // enough to hold all reasonable problem sizes
         float pq[10] = {};
         float length_squared;
 
@@ -906,10 +858,6 @@ namespace nglcu {
             count = N;
         }
 
-        auto start = std::chrono::high_resolution_clock::now();
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << "\t" << "Memory allocation for edges (" << get_available_device_memory() - M*K*sizeof(int) - count*K*sizeof(int) << "): " << std::flush;
-
         cudaMallocManaged(&edgesIn_d, M*K*sizeof(int));
         memcpy(edgesIn_d, edges, M*K*sizeof(int));
 
@@ -919,13 +867,6 @@ namespace nglcu {
         cudaMallocManaged(&bisectors_d, numSectors*D*sizeof(int));
         memcpy(bisectors_d, bisectors, numSectors*D*sizeof(int));
 
-
-        end = std::chrono::high_resolution_clock::now();
-        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-
-        start = std::chrono::high_resolution_clock::now();
-        std::cout << "\t" << "Memory allocation for vacancy array: " << std::flush;
-
         cudaMallocManaged(&vacancies_d, count*numSectors*sizeof(int));
         set_value_d<<<grid_size_1D, block_size_1D>>>(vacancies_d, numPointsPerSector, count*numSectors);
 
@@ -933,13 +874,6 @@ namespace nglcu {
         if (err != cudaSuccess)
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
-
-        end = std::chrono::high_resolution_clock::now();
-        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Memory allocation for index map " << std::flush;
 
         if (indices != NULL) {
             int *map_d;
@@ -952,46 +886,18 @@ namespace nglcu {
                 }
             }
 
-            std::cout << "(" << get_available_device_memory() - max_index*sizeof(int) << "): " << std::flush;
             cudaMallocManaged(&map_d, max_index*sizeof(int));
             for(i = 0; i < N; i++) {
                 map_d[indices[i]] = i;
             }
 
-            end = std::chrono::high_resolution_clock::now();
-	        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-            start = std::chrono::high_resolution_clock::now();
-	        std::cout << "\t" << "Mapping indices for edgesIn: " << std::flush;
-
             map_indices(edgesIn_d, map_d, M, K);
-
-            end = std::chrono::high_resolution_clock::now();
-	        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-            start = std::chrono::high_resolution_clock::now();
-	        std::cout << "\t" << "Mapping indices for edgesOut: " << std::flush;
-
             map_indices(edgesOut_d, map_d, count, K);
-
-            end = std::chrono::high_resolution_clock::now();
-	        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-            start = std::chrono::high_resolution_clock::now();
-	        std::cout << "\t" << "Freeing map index: " << std::flush;
-
             cudaFree(map_d);
         }
 
-        end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Memory allocation for X (" << get_available_device_memory() - N*D*sizeof(float) << "): " << std::flush;
-
         cudaMallocManaged(&x_d, N*D*sizeof(float));
         memcpy(x_d, X, N*D*sizeof(float));
-
-        end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Device call: " << std::flush;
 
         prune_yao_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, bisectors_d, vacancies_d, count, D, K, numSectors, edgesOut_d);
 
@@ -1000,35 +906,17 @@ namespace nglcu {
             printf("Error: %s\n", cudaGetErrorString(err));
         cudaDeviceSynchronize();
 
-        end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-
         if (indices != NULL) {
             unmap_indices(edgesOut_d, indices, count, K, N);
         }
 
-        end = std::chrono::high_resolution_clock::now();
-        std::cout << "\t" << "Unmap indices: " << std::flush;
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Copying back: " << std::flush;
-
         memcpy(edges, edgesOut_d, count*K*sizeof(int));
-
-        end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
-        start = std::chrono::high_resolution_clock::now();
-	    std::cout << "\t" << "Free remaining memory: " << std::flush;
 
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
         cudaFree(bisectors_d);
         cudaFree(vacancies_d);
-
-	    end = std::chrono::high_resolution_clock::now();
-	    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() / 1000. << " s" << std::endl;
     }
 
     void associate_probability(float *X,

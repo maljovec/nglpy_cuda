@@ -37,7 +37,7 @@ class TestGraph(unittest.TestCase):
     def test_strict(self):
         """
         Test Graph's ability to build knn and prune correctly in the
-        strict case for both discrete and continuous algorithms.
+        strict case for the continuous algorithm.
         """
         self.setup()
         graph = ngl.EmptyRegionGraph(
@@ -56,6 +56,12 @@ class TestGraph(unittest.TestCase):
 
         self.assertSetEqual(self.gold_strict, test)
 
+    def test_strict_discrete(self):
+        """
+        Test Graph's ability to build knn and prune correctly in the
+        strict case for the discrete algorithm.
+        """
+        self.setup()
         graph = ngl.EmptyRegionGraph(
             index=None,
             max_neighbors=-1,
@@ -74,7 +80,7 @@ class TestGraph(unittest.TestCase):
     def test_strict_chunked(self):
         """
         Test Graph's ability to build knn and prune correctly in the
-        strict case for both discrete and continuous algorithms.
+        strict case for the chunked continuous algorithm.
         """
         self.setup()
         graph = ngl.EmptyRegionGraph(
@@ -95,6 +101,12 @@ class TestGraph(unittest.TestCase):
 
         self.assertSetEqual(self.gold_strict, test)
 
+    def test_strict_discrete_chunked(self):
+        """
+        Test Graph's ability to build knn and prune correctly in the
+        strict case for the chunked discrete algorithm.
+        """
+        self.setup()
         graph = ngl.EmptyRegionGraph(
             index=None,
             max_neighbors=-1,
@@ -102,7 +114,8 @@ class TestGraph(unittest.TestCase):
             beta=1,
             p=2.0,
             discrete_steps=100,
-            query_size=2
+            query_size=2,
+            cached=False
         )
         graph.build(self.points)
         test = set()
@@ -114,7 +127,7 @@ class TestGraph(unittest.TestCase):
     def test_relaxed(self):
         """
         Test Graph's ability to build knn and prune correctly in the
-        strict case for both discrete and continuous algorithms.
+        relaxed case for the continuous algorithm.
         """
         self.setup()
         graph = ngl.EmptyRegionGraph(
@@ -132,6 +145,12 @@ class TestGraph(unittest.TestCase):
 
         self.assertSetEqual(self.gold_relaxed, test)
 
+    def test_relaxed_discrete(self):
+        """
+        Test Graph's ability to build knn and prune correctly in the
+        relaxed case for the discrete algorithm.
+        """
+        self.setup()
         graph = ngl.EmptyRegionGraph(
             index=None,
             max_neighbors=-1,
@@ -151,7 +170,7 @@ class TestGraph(unittest.TestCase):
     def test_relaxed_chunked(self):
         """
         Test Graph's ability to build knn and prune correctly in the
-        strict case for both discrete and continuous algorithms.
+        relaxed case for the chunked continuous algorithm.
         """
         self.setup()
         graph = ngl.EmptyRegionGraph(
@@ -171,6 +190,12 @@ class TestGraph(unittest.TestCase):
 
         self.assertSetEqual(self.gold_relaxed, test)
 
+    def test_relaxed_discrete_chunked(self):
+        """
+        Test Graph's ability to build knn and prune correctly in the
+        relaxed case for the chunked discrete algorithm.
+        """
+        self.setup()
         graph = ngl.EmptyRegionGraph(
             index=None,
             max_neighbors=-1,
@@ -178,7 +203,8 @@ class TestGraph(unittest.TestCase):
             beta=1,
             p=2.0,
             discrete_steps=100,
-            query_size=2
+            query_size=2,
+            cached=False
         )
 
         graph.build(self.points)

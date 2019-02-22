@@ -115,6 +115,7 @@ class Graph(ABC):
                                                 self.max_neighbors)
 
         indices = self.collect_additional_indices(edges, working_set)
+        indices = np.array(indices, dtype=i32)
         X = self.X[indices, :]
 
         edges = self.prune(X, edges, indices, count)
