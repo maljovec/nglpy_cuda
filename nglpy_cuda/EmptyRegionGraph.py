@@ -34,6 +34,7 @@ class EmptyRegionGraph(Graph):
                  beta=1,
                  p=2.0,
                  discrete_steps=-1,
+                 template_function=None,
                  query_size=None,
                  cached=True):
         """Initialization of the graph object. This will convert all of
@@ -71,6 +72,11 @@ class EmptyRegionGraph(Graph):
         self.beta = beta
         self.p = p
         self.discrete_steps = discrete_steps
+        if self.discrete_steps > 0 and template_function is not None:
+            self.template = np.array([template_function(
+                i / (self.discrete_steps-1)) for i in range(self.discrete_steps)], dtype=f32)
+        else:
+            self.template = None
 
     def compute_query_size(self):
         """
@@ -149,19 +155,39 @@ class EmptyRegionGraph(Graph):
 
     def prune(self, X, edges, indices=None, count=None):
         if indices is None:
-            edges = ngl.prune(X,
-                              edges,
-                              relaxed=self.relaxed,
-                              steps=self.discrete_steps,
-                              beta=self.beta,
-                              lp=self.p)
+            if self.template is not None:
+                edges = ngl.prune(X,
+                                  edges,
+                                  relaxed=self.relaxed,
+                                  template=self.template,
+                                  steps=self.discrete_steps,
+                                  beta=self.beta,
+                                  lp=self.p)
+            else:
+                edges = ngl.prune(X,
+                                  edges,
+                                  relaxed=self.relaxed,
+                                  steps=self.discrete_steps,
+                                  beta=self.beta,
+                                  lp=self.p)
         else:
-            edges = ngl.prune(X,
-                              edges,
-                              indices=indices,
-                              relaxed=self.relaxed,
-                              steps=self.discrete_steps,
-                              beta=self.beta,
-                              lp=self.p,
-                              count=count)
+            if self.template is not None:
+                edges = ngl.prune(X,
+                                  edges,
+                                  indices=indices,
+                                  relaxed=self.relaxed,
+                                  template=self.template,
+                                  steps=self.discrete_steps,
+                                  beta=self.beta,
+                                  lp=self.p,
+                                  count=count)
+            else:
+                edges = ngl.prune(X,
+                                  edges,
+                                  indices=indices,
+                                  relaxed=self.relaxed,
+                                  steps=self.discrete_steps,
+                                  beta=self.beta,
+                                  lp=self.p,
+                                  count=count)
         return edges

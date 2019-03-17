@@ -675,7 +675,7 @@ namespace nglcu {
         }
         else {
             float temp_erTemplate[steps];
-            create_template(temp_erTemplate, beta, p, steps);
+            create_template(temp_erTemplate, beta, p, steps-1);
             memcpy(erTemplate_d, temp_erTemplate, (steps)*sizeof(float));
         }
 
