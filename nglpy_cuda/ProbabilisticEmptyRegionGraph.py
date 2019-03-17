@@ -60,7 +60,7 @@ class ProbabilisticEmptyRegionGraph(EmptyRegionGraph):
         self.steepness = steepness
         self.seed = 0
         self.probabilities = None
-        super(ProbabilisticGraph, self).__init__(
+        super(ProbabilisticEmptyRegionGraph, self).__init__(
             index=index,
             max_neighbors=max_neighbors,
             relaxed=relaxed,

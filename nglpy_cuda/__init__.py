@@ -8,7 +8,7 @@ __version__ = '0.3.0'
 from .DistanceGraph import DistanceGraph
 from .ConeGraph import ConeGraph
 from .EmptyRegionGraph import EmptyRegionGraph
-from .ProbabilisticGraph import ProbabilisticGraph
+from .ProbabilisticEmptyRegionGraph import ProbabilisticEmptyRegionGraph
 from .SKLSearchIndex import SKLSearchIndex
 from .conic_spanners import yao_graph, theta_graph
 # from .FAISSSearchIndex import FAISSSearchIndex
