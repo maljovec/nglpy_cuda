@@ -59,7 +59,6 @@ class Graph(ABC):
         self.query_size = query_size
         self.cached = cached
         self.edges = None
-        self.distances = None
 
     def build(self, X):
         """ Build a graph based on the incoming data
@@ -111,8 +110,7 @@ class Graph(ABC):
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
 
-        distances, edges = self.nn_index.search(working_set,
-                                                self.max_neighbors)
+        edges = self.nn_index.search(working_set, self.max_neighbors, False)
 
         indices = self.collect_additional_indices(edges, working_set)
         indices = np.array(indices, dtype=i32)
@@ -123,26 +121,23 @@ class Graph(ABC):
         # We will cache these for later use
         if self.cached:
             self.edges[start_index:end_index, :] = edges[:count]
-            self.distances[start_index:end_index, :] = distances[:count]
 
         # Since, we are taking a lot of time to generate these, then we
         # should give the user something to process in the meantime, so
         # don't remove these lines and make sure to return in the main
         # populate before the same process is done again.
-        self.push_edges(edges[:count], distances[:count], indices[:count])
+        self.push_edges(edges[:count], indices[:count])
 
     def populate_whole(self):
         count = self.X.shape[0]
         working_set = np.array(range(count))
-        distances, edges = self.nn_index.search(working_set,
-                                                self.max_neighbors)
+        edges = self.nn_index.search(working_set, self.max_neighbors, False)
 
         edges = self.prune(self.X, edges)
 
         if self.cached:
             self.edges = edges
-            self.distances = distances
-        self.push_edges(edges, distances)
+        self.push_edges(edges)
 
     def populate(self):
         point_count = self.X.shape[0]
@@ -160,8 +155,6 @@ class Graph(ABC):
             if self.cached:
                 self.edges = np.memmap(
                     'edges.npy', dtype=i32, mode='w+', shape=data_shape)
-                self.distances = np.memmap(
-                    'distances.npy', dtype=f32, mode='w+', shape=data_shape)
 
             if self.chunked:
                 while start_index < point_count:
@@ -174,13 +167,13 @@ class Graph(ABC):
             else:
                 self.populate_whole()
         else:
-            self.push_edges(self.edges, self.distances)
+            self.push_edges(self.edges)
 
-    def push_edges(self, edges, distances, indices=None):
+    def push_edges(self, edges, indices=None):
         if indices is not None:
-            valid_edges = ngl.get_edge_list(edges, distances, indices)
+            valid_edges = ngl.get_edge_list(edges, indices)
         else:
-            valid_edges = ngl.get_edge_list(edges, distances)
+            valid_edges = ngl.get_edge_list(edges)
         for edge in valid_edges:
             self.edge_list.put(edge)
 

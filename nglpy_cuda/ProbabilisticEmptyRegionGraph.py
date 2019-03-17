@@ -79,8 +79,7 @@ class ProbabilisticEmptyRegionGraph(EmptyRegionGraph):
         count = end_index - start_index
         working_set = np.array(range(start_index, end_index))
 
-        distances, edges = self.nn_index.search(working_set,
-                                                self.max_neighbors)
+        edges = self.nn_index.search(working_set, self.max_neighbors, False)
 
         indices = working_set
         # We will need the locations of these additional points since
@@ -128,7 +127,6 @@ class ProbabilisticEmptyRegionGraph(EmptyRegionGraph):
 
         if self.cached:
             self.edges[start_index:end_index, :] = edges[:count]
-            self.distances[start_index:end_index, :] = distances[:count]
             self.probabilities[start_index:end_index, :] = probabilities[:count]
 
         # Since, we are taking a lot of time to generate these, then we
@@ -137,13 +135,12 @@ class ProbabilisticEmptyRegionGraph(EmptyRegionGraph):
         # populate before the same process is done again.
         mask = np.random.binomial(1, 1 - probabilities[:count]).astype(bool)
         edges[mask] = -1
-        self.push_edges(edges[:count], distances[:count])
+        self.push_edges(edges[:count])
 
     def populate_whole(self):
         count = self.X.shape[0]
         working_set = np.array(range(count))
-        distances, edges = self.nn_index.search(working_set,
-                                                self.max_neighbors)
+        edges = self.nn_index.search(working_set, self.max_neighbors, False)
 
         probabilities = ngl.associate_probability(
             self.X,
@@ -156,7 +153,6 @@ class ProbabilisticEmptyRegionGraph(EmptyRegionGraph):
         )
         if self.cached:
             self.edges = edges
-            self.distances = distances
             self.probabilities = probabilities
 
     def populate(self):
@@ -176,8 +172,6 @@ class ProbabilisticEmptyRegionGraph(EmptyRegionGraph):
             if self.cached:
                 self.edges = np.memmap(
                     'edges.npy', dtype=i32, mode='w+', shape=data_shape)
-                self.distances = np.memmap(
-                    'distances.npy', dtype=f32, mode='w+', shape=data_shape)
                 self.probabilities = np.memmap(
                     'probabilities.npy', dtype=f32, mode='w+', shape=data_shape)
 
@@ -195,7 +189,7 @@ class ProbabilisticEmptyRegionGraph(EmptyRegionGraph):
         mask = np.random.binomial(1, 1 - self.probabilities).astype(bool)
         self.realized_edges = np.copy(self.edges)
         self.realized_edges[mask] = -1
-        self.push_edges(self.realized_edges, self.distances)
+        self.push_edges(self.realized_edges)
 
     def neighbors(self, i):
         nn = []
