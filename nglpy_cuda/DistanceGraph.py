@@ -9,7 +9,6 @@ from .SKLSearchIndex import SKLSearchIndex
 from .Graph import Graph
 
 import time
-import psutil
 from threading import Thread
 import sys
 import os
