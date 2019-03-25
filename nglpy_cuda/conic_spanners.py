@@ -34,7 +34,7 @@ def theta_graph(X, num_sectors, points_per_sector, indices):
         representatives = np.argmax(projections, axis=1)
         max_projections = np.max(projections, axis=1)
         vacancies = points_per_sector*np.ones(len(vectors), dtype=bool)
-        order = np.argsort(max_projections)
+        order = np.argsort(np.abs(max_projections))
         for j in order:
             if indices[i, j] != i:
                 rep = representatives[j]
