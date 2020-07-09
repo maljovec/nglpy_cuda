@@ -138,3 +138,5 @@ points::
         print(edge)
 
 .. end-usage
+
+[ ~ Dependencies scanned by PyUp.io ~ ]
