@@ -7,11 +7,13 @@
 import nglpy_cuda as ngl
 import numpy as np
 
+import os
+
 from .utils import f32, i32
-from .Graph import Graph
+from .EmptyRegionGraph import EmptyRegionGraph
 
 
-class ProbabilisticGraph(Graph):
+class ProbabilisticEmptyRegionGraph(EmptyRegionGraph):
     """ A probabilistic neighborhood graph that represents an uncertain
     connectivity of a given data matrix.
 
@@ -58,7 +60,7 @@ class ProbabilisticGraph(Graph):
         self.steepness = steepness
         self.seed = 0
         self.probabilities = None
-        super(ProbabilisticGraph, self).__init__(
+        super(ProbabilisticEmptyRegionGraph, self).__init__(
             index=index,
             max_neighbors=max_neighbors,
             relaxed=relaxed,

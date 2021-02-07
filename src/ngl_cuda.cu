@@ -1,40 +1,9 @@
 #include "ngl_cuda.cuh"
+#include "utils.cuh"
 #include <cstdio>
 #include <map>
 
-#define cudaErrchk(ans) { GPUAssert((ans), __FILE__, __LINE__); }
-inline void GPUAssert(cudaError_t code, const char *file, int line,
-                      bool abort=true) {
-	if (code != cudaSuccess) {
-        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file,
-                line);
-		if (abort) exit(code);
-	}
-}
-
 namespace nglcu {
-    dim3 block_size(32, 32);
-    dim3 grid_size(4, 4);
-    dim3 block_size_1D(1024);
-    dim3 grid_size_1D(16);
-
-    __global__
-    void unmap_indices_d(int *matrix, int *map, int M, int N) {
-        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
-        int stride_x = blockDim.x * gridDim.x;
-
-        int index_y = blockIdx.y * blockDim.y + threadIdx.y;
-        int stride_y = blockDim.y * gridDim.y;
-
-        int row, col;
-        for (row = index_y; row < M; row += stride_y) {
-            for (col = index_x; col < N; col += stride_x) {
-                if(matrix[row*N+col] != -1) {
-                    matrix[row*N+col] = map[matrix[row*N+col]];
-                }
-            }
-        }
-    }
 
     __device__
     float logistic_function(float x, float r, float steepness=3.) {
@@ -223,6 +192,8 @@ namespace nglcu {
 
         float *p, *q, *r;
 
+        // TODO: Do not hard-code these vector sizes, or make it large
+        // enough to hold all reasonable problem sizes
         float pq[10] = {};
         float pr[10] = {};
 
@@ -317,6 +288,8 @@ namespace nglcu {
 
         float *p, *q, *r;
 
+        // TODO: Do not hard-code these vector sizes, or make it large
+        // enough to hold all reasonable problem sizes
         float pq[10] = {};
         float pr[10] = {};
 
@@ -420,6 +393,8 @@ namespace nglcu {
 
         float *p, *q, *r;
 
+        // TODO: Do not hard-code these vector sizes, or make it large
+        // enough to hold all reasonable problem sizes
         float pq[10] = {};
         float pr[10] = {};
 
@@ -526,6 +501,8 @@ namespace nglcu {
 
         float *p, *q, *r;
 
+        // TODO: Do not hard-code these vector sizes, or make it large
+        // enough to hold all reasonable problem sizes
         float pq[10] = {};
         float pr[10] = {};
 
@@ -612,29 +589,6 @@ namespace nglcu {
         }
     }
 
-    void map_indices(int *matrix_d, int *map_d, int M, int N) {
-        unmap_indices_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess)
-            printf("Error: %s\n", cudaGetErrorString(err));
-        cudaDeviceSynchronize();
-    }
-
-    void unmap_indices(int *matrix_d, int *map, int M, int N, int K) {
-        int *map_d;
-
-        cudaMallocManaged(&map_d, K*sizeof(int));
-        memcpy(map_d, map, K*sizeof(int));
-
-        unmap_indices_d<<<grid_size, block_size>>>(matrix_d, map_d, M, N);
-
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess)
-            printf("Error: %s\n", cudaGetErrorString(err));
-        cudaDeviceSynchronize();
-        cudaFree(map_d);
-    }
-
     float min_distance_from_edge(float t, float beta, float p) {
         float xC = 0;
         float yC = 0;
@@ -696,17 +650,18 @@ namespace nglcu {
         if (indices != NULL) {
             int *map_d;
             int i;
-            int max_idx = 0;
-            for(i = 0; i < count; i++) {
-                max_idx = indices[i] > max_idx ? indices[i] : max_idx;
+            int max_index = 0;
+            for(i = 0; i < N; i++) {
+                max_index = indices[i] > max_index ? indices[i] : max_index;
             }
 
-            cudaMallocManaged(&map_d, max_idx*sizeof(int));
-            for(i = 0; i < count; i++) {
+            cudaMallocManaged(&map_d, max_index*sizeof(int));
+            for(i = 0; i < N; i++) {
                 map_d[indices[i]] = i;
             }
+
             map_indices(edgesIn_d, map_d, M, K);
-            map_indices(edgesOut_d, map_d, M, K);
+            map_indices(edgesOut_d, map_d, count, K);
             cudaFree(map_d);
         }
 
@@ -720,7 +675,7 @@ namespace nglcu {
         }
         else {
             float temp_erTemplate[steps];
-            create_template(temp_erTemplate, beta, p, steps);
+            create_template(temp_erTemplate, beta, p, steps-1);
             memcpy(erTemplate_d, temp_erTemplate, (steps)*sizeof(float));
         }
 
@@ -750,7 +705,7 @@ namespace nglcu {
         cudaDeviceSynchronize();
 
         if (indices != NULL) {
-            unmap_indices(edgesOut_d, indices, M, K, count);
+            unmap_indices(edgesOut_d, indices, count, K, N);
         }
 
         memcpy(edges, edgesOut_d, count*K*sizeof(int));
@@ -771,33 +726,31 @@ namespace nglcu {
             count = N;
         }
 
-        cudaMallocManaged(&edgesIn_d, M*K*sizeof(int));
+        cudaErrchk(cudaMallocManaged(&edgesIn_d, M*K*sizeof(int)));
         memcpy(edgesIn_d, edges, M*K*sizeof(int));
 
-        cudaMallocManaged(&edgesOut_d, count*K*sizeof(int));
+        cudaErrchk(cudaMallocManaged(&edgesOut_d, count*K*sizeof(int)));
         memcpy(edgesOut_d, edges, count*K*sizeof(int));
 
         if (indices != NULL) {
             int *map_d;
             int i;
-
             int max_index = 0;
             for(i = 0; i < N; i++) {
-                if(indices[i] > max_index) {
-                    max_index = indices[i];
-                }
+                max_index = indices[i] > max_index ? indices[i] : max_index;
             }
 
             cudaMallocManaged(&map_d, max_index*sizeof(int));
             for(i = 0; i < N; i++) {
                 map_d[indices[i]] = i;
             }
+
             map_indices(edgesIn_d, map_d, M, K);
             map_indices(edgesOut_d, map_d, count, K);
             cudaFree(map_d);
         }
 
-        cudaMallocManaged(&x_d, N*D*sizeof(float));
+        cudaErrchk(cudaMallocManaged(&x_d, N*D*sizeof(float)));
         memcpy(x_d, X, N*D*sizeof(float));
 
         if (relaxed) {
@@ -821,6 +774,149 @@ namespace nglcu {
         cudaFree(x_d);
         cudaFree(edgesIn_d);
         cudaFree(edgesOut_d);
+    }
+
+    __global__
+    void set_value_d(int *X, int value, int N) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        for (int i = index_x; i < N; i += stride_x) {
+            X[i] = value;
+        }
+    }
+
+    __global__
+    void prune_yao_d(float *X, int *edgesIn, float *bisectors, int *vacancies,
+                     int N, int D, int K, int numSectors, int *edgesOut) {
+        int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+        int stride_x = blockDim.x * gridDim.x;
+
+        // int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+        // int stride_y = blockDim.y * gridDim.y;
+
+        int i, j, k, d;
+
+        float *p, *q;
+
+        // TODO: Do not hard-code this vector size, or make it large
+        // enough to hold all reasonable problem sizes
+        float pq[10] = {};
+        float length_squared;
+
+        for (i = index_x; i < N; i += stride_x) {
+            for (k = 0; k < K; k++) {
+                p = &(X[D*i]);
+                j = edgesIn[K*i+k];
+                q = &(X[D*j]);
+
+                length_squared = 0;
+                for(d = 0; d < D; d++) {
+                    pq[d] = q[d] - p[d];
+                    length_squared += pq[d]*pq[d];
+                }
+                // A point should not be connected to itself
+                if(length_squared == 0) {
+                    edgesOut[K*i+k] = -1;
+                    continue;
+                }
+
+                // pq dot bisectors
+                int representative_sector = -1;
+                float max_projection = 0;
+                for( j = 0; j < numSectors; j++) {
+                    float projection = 0;
+                    for (d = 0; d < D; d++) {
+                        projection += pq[d]*bisectors[j*D+d];
+                    }
+                    if (projection > max_projection || representative_sector < 0) {
+                        max_projection = projection;
+                        representative_sector = j;
+                    }
+                }
+
+                if (vacancies[i*numSectors + representative_sector] > 0) {
+                    vacancies[i*numSectors + representative_sector]--;
+                }
+                else {
+                    edgesOut[K*i+k] = -1;
+                }
+
+            }
+        }
+    }
+
+    void prune_yao(float *X, float *bisectors, int *edges, int *indices, int N, int D, int M, int K,
+               int numSectors, int numPointsPerSector, int count) {
+        float *x_d;
+        float *bisectors_d;
+        int *edgesIn_d;
+        int *edgesOut_d;
+        int *vacancies_d;
+
+        if (count < 0) {
+            count = N;
+        }
+
+        cudaMallocManaged(&edgesIn_d, M*K*sizeof(int));
+        memcpy(edgesIn_d, edges, M*K*sizeof(int));
+
+        cudaMallocManaged(&edgesOut_d, count*K*sizeof(int));
+        memcpy(edgesOut_d, edges, count*K*sizeof(int));
+
+        cudaMallocManaged(&bisectors_d, numSectors*D*sizeof(int));
+        memcpy(bisectors_d, bisectors, numSectors*D*sizeof(int));
+
+        cudaMallocManaged(&vacancies_d, count*numSectors*sizeof(int));
+        set_value_d<<<grid_size_1D, block_size_1D>>>(vacancies_d, numPointsPerSector, count*numSectors);
+
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+            printf("Error: %s\n", cudaGetErrorString(err));
+        cudaDeviceSynchronize();
+
+        if (indices != NULL) {
+            int *map_d;
+            int i;
+
+            int max_index = 0;
+            for(i = 0; i < N; i++) {
+                if (indices[i] > max_index) {
+                    max_index = indices[i];
+                }
+            }
+
+            cudaMallocManaged(&map_d, max_index*sizeof(int));
+            for(i = 0; i < N; i++) {
+                map_d[indices[i]] = i;
+            }
+
+            map_indices(edgesIn_d, map_d, M, K);
+            map_indices(edgesOut_d, map_d, count, K);
+            cudaFree(map_d);
+        }
+
+        cudaMallocManaged(&x_d, N*D*sizeof(float));
+        memcpy(x_d, X, N*D*sizeof(float));
+
+        prune_yao_d<<<grid_size_1D, block_size_1D>>>(x_d, edgesIn_d, bisectors_d, vacancies_d, count, D, K, numSectors, edgesOut_d);
+
+        err = cudaGetLastError();
+        if (err != cudaSuccess)
+            printf("Error: %s\n", cudaGetErrorString(err));
+        cudaDeviceSynchronize();
+
+        if (indices != NULL) {
+            unmap_indices(edgesOut_d, indices, count, K, N);
+        }
+
+        memcpy(edges, edgesOut_d, count*K*sizeof(int));
+
+        cudaFree(x_d);
+        cudaFree(edgesIn_d);
+        cudaFree(edgesOut_d);
+        cudaFree(bisectors_d);
+        cudaFree(vacancies_d);
     }
 
     void associate_probability(float *X,

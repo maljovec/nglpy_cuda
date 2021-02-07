@@ -9,12 +9,17 @@ from .SKLSearchIndex import SKLSearchIndex
 
 from threading import Thread
 import sys
+import os
+import abc
 if sys.version_info.major >= 3:
     from queue import Queue, Empty
+    ABC = abc.ABC
 else:
     from Queue import Queue, Empty
+    ABC = abc.ABCMeta('ABC', (), {})
 
-class Graph(object):
+
+class Graph(ABC):
     """ A neighborhood graph that represents the connectivity of a given
     data matrix.
 
@@ -25,11 +30,8 @@ class Graph(object):
     def __init__(self,
                  index=None,
                  max_neighbors=-1,
-                 relaxed=False,
-                 beta=1,
-                 p=2.0,
-                 discrete_steps=-1,
-                 query_size=None):
+                 query_size=None,
+                 cached=False):
         """Initialization of the graph object. This will convert all of
         the passed in parameters into parameters the C++ implementation
         of NGL can understand and then issue an external call to that
@@ -40,27 +42,22 @@ class Graph(object):
                 be queried and pruned
             max_neighbors (int): The maximum number of neighbors to
                 associate with any single point in the dataset.
-            relaxed (bool): Whether the relaxed ERG should be computed
-            beta (float): Defines the shape of the beta skeleton
-            p (float): The Lp-norm to use in computing the shape
-            discrete_steps (int): The number of steps to use if using
-                the discrete version. -1 (default) signifies to use the
-                continuous algorithm.
             query_size (int): The number of points to process with each
                 call to the GPU, this should be computed based on
                 available resources
+            cached (bool): Flag denoting whether the resulting computation
+                should be stored for future use, will consume more memory,
+                but can drastically reduce the runtime for subsequent
+                iterations through the data.
         """
         self.X = np.array([[]], dtype=f32)
         self.max_neighbors = max_neighbors
-        self.relaxed = relaxed
-        self.beta = beta
-        self.p = p
-        self.discrete_steps = discrete_steps
         if index is None:
             self.nn_index = SKLSearchIndex()
         else:
             self.nn_index = index
         self.query_size = query_size
+        self.cached = cached
         self.edges = None
         self.distances = None
 
@@ -79,48 +76,16 @@ class Graph(object):
 
         self.nn_index.fit(self.X)
 
-        available_gpu_memory = ngl.get_available_device_memory()
         if self.query_size is None:
-            # Because we are using f32 and i32:
-            bytes_per_number = 4
-            N, D = X.shape
-            k = self.max_neighbors
-
-            # Worst-case upper bound limit of the number of points
-            # needed in a single query
-            if self.relaxed:
-                # For the relaxed algorithm we need n*D storage for the
-                # point locations plus n*k for the representation of the
-                # input edges plus another n*k for the output edges
-                # We could potentially only need one set of edges for
-                # this version
-                worst_case = D + 2*k
-            else:
-                # For the strict algorithm, if we are processing n
-                # points at a time, we need the point locations of all
-                # of their neigbhors, thus in the worst case, we need
-                # n + n*k point locations and rows of the edge matrix.
-                # the 2*k again represents the need for two versions of
-                # the edge matrix. Here, we definitely need an input and
-                # an output array
-                worst_case = (D + 2*k) * (k + 1)
-
-            # If we are using the discrete algorithm, remember we need
-            # to add the template's storage as well to the GPU
-            if self.discrete_steps > 0:
-                available_gpu_memory -= self.discrete_steps*bytes_per_number
-
-            divisor = bytes_per_number * worst_case
-
-            self.query_size = min(available_gpu_memory // divisor, N)
-
-        self.query_size = int(self.query_size)
+            self.query_size = self.compute_query_size()
 
         self.chunked = self.X.shape[0] > self.query_size
+
         # print('Problem Size: {}'.format(N))
         # print('  Query Size: {}'.format(self.query_size))
         # print('  GPU Memory: {}'.format(available_gpu_memory))
         # print('     Chunked: {}'.format(self.chunked))
+        sys.stdout.flush()
 
         self.edge_list = Queue(self.query_size*10)
         self.needs_reset = False
@@ -128,6 +93,18 @@ class Graph(object):
         self.worker_thread = Thread(target=self.populate)
         self.worker_thread.daemon = True
         self.worker_thread.start()
+
+    @abc.abstractmethod
+    def compute_query_size(self):
+        pass
+
+    @abc.abstractmethod
+    def collect_additional_indices(self, edges, indices):
+        pass
+
+    @abc.abstractmethod
+    def prune(self, X, edges, indices=None, count=None):
+        pass
 
     def populate_chunk(self, start_index):
         end_index = min(start_index+self.query_size, self.X.shape[0])
@@ -137,51 +114,16 @@ class Graph(object):
         distances, edges = self.nn_index.search(working_set,
                                                 self.max_neighbors)
 
-        indices = working_set
-        # We will need the locations of these additional points since
-        # we need to know if they fall into the empty region of any
-        # edges above
-        additional_indices = np.setdiff1d(edges.ravel(),
-                                          working_set)
-
-        if additional_indices.shape[0] > 0:
-            # It is possible that we cannot store the entirety of X
-            # and edges on the GPU, so figure out the subset of Xs and
-            # carefully replace the edges values
-            indices = np.hstack((working_set, additional_indices))
-            if not self.relaxed:
-                neighbor_edges = self.nn_index.search(additional_indices,
-                                                      self.max_neighbors,
-                                                      False)
-
-                # We don't care about whether any of the edges of these
-                # extra rows are valid yet, but the algorithm will need
-                # them to prune correctly
-                edges = np.vstack((edges, neighbor_edges))
-
-                # Since we will be using the edges above for queries, we
-                # need to make sure we have the locations of everything
-                # they touch
-                neighbor_indices = np.setdiff1d(neighbor_edges.ravel(),
-                                                indices)
-
-                if neighbor_indices.shape[0] > 0:
-                    indices = np.hstack((indices, neighbor_indices))
-
-        indices = indices.astype(i32)
+        indices = self.collect_additional_indices(edges, working_set)
+        indices = np.array(indices, dtype=i32)
         X = self.X[indices, :]
-        edges = ngl.prune(X,
-                          edges,
-                          indices=indices,
-                          relaxed=self.relaxed,
-                          steps=self.discrete_steps,
-                          beta=self.beta,
-                          lp=self.p,
-                          count=count)
+
+        edges = self.prune(X, edges, indices, count)
 
         # We will cache these for later use
-        self.edges[start_index:end_index, :] = edges[:count]
-        self.distances[start_index:end_index, :] = distances[:count]
+        if self.cached:
+            self.edges[start_index:end_index, :] = edges[:count]
+            self.distances[start_index:end_index, :] = distances[:count]
 
         # Since, we are taking a lot of time to generate these, then we
         # should give the user something to process in the meantime, so
@@ -195,32 +137,44 @@ class Graph(object):
         distances, edges = self.nn_index.search(working_set,
                                                 self.max_neighbors)
 
-        edges = ngl.prune(self.X,
-                          edges,
-                          relaxed=self.relaxed,
-                          steps=self.discrete_steps,
-                          beta=self.beta,
-                          lp=self.p)
+        edges = self.prune(self.X, edges)
 
-        self.edges = edges
-        self.distances = distances
+        if self.cached:
+            self.edges = edges
+            self.distances = distances
+        self.push_edges(edges, distances)
 
     def populate(self):
-        if self.edges is None:
-            data_shape = (self.X.shape[0], self.max_neighbors)
-            self.edges = np.memmap(
-                'edges.npy', dtype=i32, mode='w+', shape=data_shape)
-            self.distances = np.memmap(
-                'distances.npy', dtype=f32, mode='w+', shape=data_shape)
+        point_count = self.X.shape[0]
+        start_index = 0
+        if self.edges is not None:
+            start_index = point_count
+
+        fname = 'nglpy.checkpoint'
+        if self.cached and os.path.isfile(fname):
+            with open(fname, 'r') as f:
+                start_index = int(f.read())
+
+        if self.edges is None or start_index < point_count:
+            data_shape = (point_count, self.max_neighbors)
+            if self.cached:
+                self.edges = np.memmap(
+                    'edges.npy', dtype=i32, mode='w+', shape=data_shape)
+                self.distances = np.memmap(
+                    'distances.npy', dtype=f32, mode='w+', shape=data_shape)
+
             if self.chunked:
-                start_index = 0
-                while start_index < self.X.shape[0]:
+                while start_index < point_count:
                     self.populate_chunk(start_index)
                     start_index += self.query_size
-                return
+                    start_index = min(start_index, point_count)
+                    with open(fname, 'w') as f:
+                        f.write(str(start_index))
+                    print('Checkpoint: {}'.format(start_index))
             else:
                 self.populate_whole()
-        self.push_edges(self.edges, self.distances)
+        else:
+            self.push_edges(self.edges, self.distances)
 
     def push_edges(self, edges, distances, indices=None):
         if indices is not None:
@@ -271,6 +225,9 @@ class Graph(object):
 
     def neighbors(self, i):
         nn = []
+        if self.edges is None:
+            raise NotImplementedError
+
         for value in self.edges[i]:
             if value != -1:
                 nn.append(value)
